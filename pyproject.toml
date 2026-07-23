@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pierrondi-solver"
+version = "0.1.0"
+description = "Self-hosted CAPTCHA-solving service (reCAPTCHA v2 audio/image, v3 score mitigation) with commercial fallbacks"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "pydantic>=2.6",
+]
+
+[project.scripts]
+pierrondi-solve = "pierrondi_solver.client:main"
+
+[project.optional-dependencies]
+local-solve = [
+    "playwright>=1.44",
+    "faster-whisper>=1.0",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+markers = [
+    "live: real browser/network solves (gated, never in CI)",
+]
