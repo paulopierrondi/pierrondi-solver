@@ -25,8 +25,11 @@ flowchart LR
 | --- | --- |
 | `main.py` | FastAPI application and `/health`, `/metrics`, `/solve` routes |
 | `client.py` | Challenge detection, Python client, CLI, and `doctor` audit |
+| `mcp_server.py` | MCP server exposing solver as tools for any MCP-compatible agent/coder (Codex, Gemini, Antigravity, Claude Code) |
 | `chain.py` | Ordered provider cascade and first-success result |
-| `strategies/` | Local challenge-specific implementations |
+| `strategies/` | Local challenge-specific implementations (reCAPTCHA v2 audio/image, v3 guidance, hCaptcha audio, Cloudflare clearance) |
+| `proxy.py` | Proxy / identity layer: `ProxyBackend` (static/rotating/sticky) + `IdentityContext` (binds UA + IP + cookie) |
+| `browser/` | Engine-agnostic browser backend (`BrowserBackend`): Chromium, Firefox, nodriver (undetected Chrome via CDP), and camoufox (hardened Firefox) clearance harvesters, selectable via `SOLVER_BROWSER_ENGINE` |
 | `providers/commercial.py` | Commercial fallback adapters |
 | `circuit_breaker.py` | Sliding-window failure isolation per provider |
 | `telemetry.py` | SQLite attempt log and provider-level metrics |
@@ -50,6 +53,54 @@ pierrondi (local) → capsolver → 2captcha → capmonster
 ```
 
 Set `CAPTCHA_PROVIDER` to pin a single provider.
+
+## Browser backends (multi-engine)
+
+Local clearance strategies (Cloudflare interstitial today; local hCaptcha /
+Turnstile in future slices) do not bind to a single browser engine. They depend
+on a `BrowserBackend` interface and delegate the actual harvest to the selected
+engine.
+
+```mermaid
+flowchart LR
+    S["CloudflareClearanceStrategy"] --> B["BrowserBackend"]
+    B --> C["ChromiumBackend"]
+    B --> F["FirefoxBackend"]
+    B --> N["NodriverBackend"]
+    C --> CC["Playwright Chromium + stealth"]
+    F --> FF["Playwright Firefox"]
+    N --> NN["Chrome via CDP (undetected, no webdriver)"]
+```
+
+`SOLVER_BROWSER_ENGINE` selects the backend (`chromium` default; `firefox` and
+`nodriver` opt-in). Each backend reports its optional dependencies via
+`deps_missing()`; when the engine is unavailable the chain skips it without
+burning breaker budget — the same convention used for provider API keys and
+strategy stubs. The `engine` that produced a clearance is returned in
+`extra.engine` for telemetry.
+
+## Proxy / identity layer
+
+Cloudflare clearance is bound to the IP that solved the challenge AND the
+User-Agent presented. Without proxy control, clearance is single-use and tied to
+the host IP — useless for multi-account or geo-diverse flows.
+
+`ProxyBackend` (in `proxy.py`) resolves a proxy connect string for a given
+lane/session:
+
+| Backend | Env | Behavior |
+| --- | --- | --- |
+| `StaticProxyBackend` | `SOLVER_PROXY` | Single fixed proxy (may be None) |
+| `RotatingProxyBackend` | `SOLVER_PROXY_ENDPOINT` | Fresh IP each call (residential) |
+| `StickyProxyBackend` | `SOLVER_PROXY_ENDPOINT` + `SOLVER_PROXY_STICKY=1` | Same IP per session key within `SOLVER_PROXY_STICKY_TTL` |
+
+`IdentityContext` makes the (UA + IP + cookie) binding explicit: a clearance is
+only reusable when all three axes are consistent. Proxy credentials come from
+env only; successful clearance metadata returns an 8-char hash of the connect
+string for correlation, never the value. Proxy resolution fails closed when a
+configured endpoint is unavailable. Chromium, Firefox, and camoufox support the
+proxy path; nodriver currently reports `proxy_not_supported` rather than silently
+harvesting on the host IP.
 
 ## Data handling
 

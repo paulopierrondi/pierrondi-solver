@@ -1,6 +1,10 @@
 from pierrondi_solver.models import ChallengeType, SolveRequest
 from pierrondi_solver.strategies.recaptcha_v2_audio import RecaptchaV2AudioStrategy
-from pierrondi_solver.strategies.recaptcha_v2_image import RecaptchaV2ImageStrategy
+from pierrondi_solver.strategies.recaptcha_v2_image import (
+    RecaptchaV2ImageStrategy,
+    get_classifier,
+    register_classifier,
+)
 from pierrondi_solver.strategies.recaptcha_v3 import V3_MITIGATION, RecaptchaV3Strategy
 
 
@@ -45,3 +49,37 @@ def test_v2_image_honest_stub():
     outcome = RecaptchaV2ImageStrategy().solve(req())
     assert outcome.solved is False
     assert outcome.reason.startswith("not_implemented")
+
+
+def test_v2_image_no_classifier_registered():
+    # default: no classifier -> honest not_implemented
+    assert get_classifier() is None
+    outcome = RecaptchaV2ImageStrategy().solve(req())
+    assert outcome.solved is False
+    assert "no tile classifier registered" in outcome.reason
+
+
+def test_v2_image_registers_classifier(monkeypatch):
+    class _FakeClassifier:
+        def classify(self, prompt, tile_images):
+            return [0, 3]
+
+    register_classifier(_FakeClassifier())
+    try:
+        assert get_classifier() is not None
+        # With a classifier but playwright simulated missing -> deps_missing
+        monkeypatch.setattr(
+            "pierrondi_solver.strategies.recaptcha_v2_image._playwright_missing",
+            lambda: True,
+        )
+        outcome = RecaptchaV2ImageStrategy().solve(req())
+        assert outcome.solved is False
+        assert outcome.reason.startswith("deps_missing")
+    finally:
+        register_classifier(None)  # reset global for test isolation
+
+
+def test_v2_image_supports_only_v2():
+    s = RecaptchaV2ImageStrategy()
+    assert s.supports(ChallengeType.recaptcha_v2)
+    assert not s.supports(ChallengeType.hcaptcha)

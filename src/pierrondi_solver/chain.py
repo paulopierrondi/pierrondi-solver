@@ -7,7 +7,9 @@ from .circuit_breaker import CircuitBreaker
 from .config import PROVIDER_PIERRONDI, Config
 from .models import ChallengeType, SolveRequest, SolveResult, StrategyOutcome, UnsolvedError
 from .providers.commercial import build_commercial_providers
-from .strategies.cloudflare_clearance import CloudflareClearanceStrategy
+from .proxy import build_proxy_backend
+from .strategies.cloudflare_clearance import build_cloudflare_strategy
+from .strategies.hcaptcha import HCaptchaAudioStrategy
 from .strategies.recaptcha_v2_audio import RecaptchaV2AudioStrategy
 from .strategies.recaptcha_v2_image import RecaptchaV2ImageStrategy
 from .strategies.recaptcha_v3 import RecaptchaV3Strategy
@@ -29,12 +31,27 @@ class SolverChain:
         self.telemetry = telemetry
         if strategies is None:
             commercial = build_commercial_providers(config.api_keys, config.proxies)
+            proxy_backend = build_proxy_backend(
+                {
+                    "SOLVER_PROXY": config.proxy,
+                    "SOLVER_PROXY_ENDPOINT": config.proxy_endpoint,
+                    "SOLVER_PROXY_STICKY": "1" if config.proxy_sticky else "",
+                    "SOLVER_PROXY_STICKY_TTL": str(config.proxy_sticky_ttl),
+                }
+            )
             strategies = {
                 PROVIDER_PIERRONDI: [
                     RecaptchaV2AudioStrategy(),
                     RecaptchaV2ImageStrategy(),
                     RecaptchaV3Strategy(),
-                    CloudflareClearanceStrategy(),
+                    HCaptchaAudioStrategy(
+                        accessibility_cookie=config.hcaptcha_accessibility_cookie
+                    ),
+                    build_cloudflare_strategy(
+                        config.browser_engine,
+                        proxy_backend=proxy_backend,
+                        proxy_required=bool(config.proxy or config.proxy_endpoint),
+                    ),
                 ],
                 "capsolver": [commercial["capsolver"]],
                 "capmonster": [commercial["capmonster"]],

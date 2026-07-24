@@ -15,10 +15,10 @@ def test_supports_only_cloudflare():
 
 
 def test_missing_playwright_reports_deps_missing(monkeypatch):
-    # playwright IS installed in this venv; simulate its absence
+    # playwright IS installed in this venv; simulate its absence at the backend.
+    # After the BrowserBackend extraction, deps are reported by the backend.
     monkeypatch.setattr(
-        "pierrondi_solver.strategies.cloudflare_clearance._playwright_missing",
-        lambda: True,
+        "pierrondi_solver.browser.chromium._playwright_missing", lambda: True
     )
     outcome = CloudflareClearanceStrategy().solve(req())
     assert outcome.solved is False
