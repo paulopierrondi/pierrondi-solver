@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Pierrondi Solver mark</title>
+  <desc id="desc">A signal crossing a verification gate, representing autonomous challenge resolution.</desc>
+  <defs>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#182018" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="72" fill="#050706"/>
+  <rect x="1" y="1" width="510" height="510" rx="71" fill="none" stroke="#273026" stroke-width="2"/>
+  <rect x="1" y="1" width="510" height="510" rx="71" fill="url(#grid)" opacity=".7"/>
+  <path d="M124 112v288M388 112v288" stroke="#F4F7F2" stroke-width="28" stroke-linecap="square"/>
+  <path d="M76 318h122l58-124 58 82h122" fill="none" stroke="#B7FF2A" stroke-width="28" stroke-linejoin="miter"/>
+  <rect x="218" y="156" width="76" height="76" transform="rotate(45 256 194)" fill="#050706" stroke="#F4F7F2" stroke-width="10"/>
+  <path d="M232 194l18 18 34-39" fill="none" stroke="#B7FF2A" stroke-width="14" stroke-linecap="square" stroke-linejoin="miter"/>
+  <circle cx="76" cy="318" r="10" fill="#B7FF2A"/>
+  <circle cx="436" cy="276" r="10" fill="#B7FF2A"/>
+</svg>

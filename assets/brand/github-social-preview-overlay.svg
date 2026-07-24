@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="veil" x1="0" x2="1">
+      <stop offset="0" stop-color="#050706" stop-opacity=".99"/>
+      <stop offset=".56" stop-color="#050706" stop-opacity=".95"/>
+      <stop offset=".80" stop-color="#050706" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#050706" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#veil)"/>
+  <path d="M0 4h1280" stroke="#B7FF2A" stroke-width="8"/>
+  <text x="64" y="76" fill="#B7FF2A" font-family="Menlo" font-size="18" letter-spacing="4">PIERRONDI / OPEN SOURCE LABS</text>
+  <text x="64" y="180" fill="#F4F7F2" font-family="Arial" font-size="78" font-weight="700" letter-spacing="-3">PIERRONDI</text>
+  <text x="64" y="264" fill="#F4F7F2" font-family="Arial" font-size="78" font-weight="700" letter-spacing="-3">SOLVER</text>
+  <path d="M66 300h112" stroke="#B7FF2A" stroke-width="8"/>
+  <text x="64" y="356" fill="#C8CEC8" font-family="Arial" font-size="30">Self-hosted challenge resolution</text>
+  <text x="64" y="396" fill="#C8CEC8" font-family="Arial" font-size="30">for AI agents.</text>
+  <g font-family="Menlo" font-size="15" letter-spacing="1.5">
+    <rect x="64" y="455" width="160" height="48" rx="4" fill="#111512" stroke="#344034"/>
+    <text x="86" y="485" fill="#F4F7F2">$0 LOCAL PATH</text>
+    <rect x="238" y="455" width="160" height="48" rx="4" fill="#111512" stroke="#344034"/>
+    <text x="262" y="485" fill="#F4F7F2">ONE HTTP API</text>
+    <rect x="412" y="455" width="184" height="48" rx="4" fill="#111512" stroke="#344034"/>
+    <text x="434" y="485" fill="#F4F7F2">AGENT-NATIVE</text>
+  </g>
+  <text x="64" y="578" fill="#7E877F" font-family="Menlo" font-size="16" letter-spacing="2">MIT  /  FASTAPI  /  PLAYWRIGHT  /  WHISPER</text>
+  <text x="1110" y="578" fill="#B7FF2A" font-family="Menlo" font-size="16" letter-spacing="2">v0.1</text>
+</svg>

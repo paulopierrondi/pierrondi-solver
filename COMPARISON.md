@@ -1,8 +1,10 @@
-# Competitive landscape — pierrondi-solver vs what exists (2026-07)
+# Competitive landscape — focused tools vs an integrated agent layer (2026-07)
 
-Researched before publishing. Verdict: **no existing project unifies local CAPTCHA tokens +
-Cloudflare clearance + commercial fallback cascade + cost telemetry + agent-native hooks.**
-pierrondi-solver is the only complete package; others are single-problem pieces.
+This snapshot explains product trade-offs, not an absolute or permanent
+uniqueness claim. The central difference is packaging: `pierrondi-solver`
+combines local CAPTCHA paths, Cloudflare clearance, commercial fallback,
+circuit breaking, cost telemetry, and agent interfaces behind one contract.
+Most alternatives deliberately focus on one part of that stack.
 
 | Project | reCAPTCHA v2 | Cloudflare IUAM | Commercial fallback | Circuit breaker | Cost telemetry | Agent-native | Service API |
 |---|---|---|---|---|---|---|---|
@@ -20,9 +22,9 @@ pierrondi-solver is the only complete package; others are single-problem pieces.
 - **FlareSolverr** — the standard for Cloudflare, but: no CAPTCHA token solving natively,
   degrades against managed/interactive challenges, no local/ paid hybrid cascade, no per-provider
   success/cost accounting. Ours does clearance *and* tokens, and tells you what every attempt cost.
-- **ibedevesh/capsolver** (Feb 2026, "for AI Agents") — closest in spirit for v2 audio+whisper,
+- **ibedevesh/capsolver** (Feb 2026, "for AI Agents") — close in spirit for v2 audio+whisper,
   but it's a library, v2-only: no service, no Cloudflare, no fallback chain, no breaker, no telemetry,
-  no hook integration. Ours is a superset.
+  no hook integration. `pierrondi-solver` provides a broader operational surface.
 - **uncaptcha/uncaptcha2** — the academic origin (USENIX WOOT'17, 85-91%). Unmaintained;
   Google has iterated since. We use the same audio insight with modern faster-whisper on CPU,
   stealth browser context, and production plumbing around it.

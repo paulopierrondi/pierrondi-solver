@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Pierrondi Solver GitHub social preview</title>
+  <desc id="desc">Self-hosted challenge resolution for AI agents.</desc>
+  <defs>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#162016" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="veil" x1="0" x2="1">
+      <stop offset="0" stop-color="#050706" stop-opacity=".99"/>
+      <stop offset=".56" stop-color="#050706" stop-opacity=".95"/>
+      <stop offset=".80" stop-color="#050706" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#050706" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="#050706"/>
+  <rect width="1280" height="640" fill="url(#grid)" opacity=".72"/>
+  <g opacity=".9">
+    <path d="M902 105v416M1098 105v416" stroke="#F4F7F2" stroke-width="8"/>
+    <path d="M720 435h170l110-260 88 172h142" fill="none" stroke="#B7FF2A" stroke-width="10"/>
+    <rect x="958" y="211" width="84" height="84" transform="rotate(45 1000 253)" fill="#050706" stroke="#F4F7F2" stroke-width="5"/>
+    <path d="M974 252l20 20 39-45" fill="none" stroke="#B7FF2A" stroke-width="9"/>
+    <path d="M742 94l435 435M742 529l435-435" stroke="#273026" stroke-width="1"/>
+  </g>
+  <rect width="1280" height="640" fill="url(#veil)"/>
+  <path d="M0 4h1280" stroke="#B7FF2A" stroke-width="8"/>
+  <text x="64" y="76" fill="#B7FF2A" font-family="Menlo" font-size="18" letter-spacing="4">PIERRONDI / OPEN SOURCE LABS</text>
+  <text x="64" y="180" fill="#F4F7F2" font-family="Arial" font-size="78" font-weight="700" letter-spacing="-3">PIERRONDI</text>
+  <text x="64" y="264" fill="#F4F7F2" font-family="Arial" font-size="78" font-weight="700" letter-spacing="-3">SOLVER</text>
+  <path d="M66 300h112" stroke="#B7FF2A" stroke-width="8"/>
+  <text x="64" y="356" fill="#C8CEC8" font-family="Arial" font-size="30">Self-hosted challenge resolution</text>
+  <text x="64" y="396" fill="#C8CEC8" font-family="Arial" font-size="30">for AI agents.</text>
+  <g font-family="Menlo" font-size="15" letter-spacing="1.5">
+    <rect x="64" y="455" width="160" height="48" rx="4" fill="#111512" stroke="#344034"/>
+    <text x="86" y="485" fill="#F4F7F2">$0 LOCAL PATH</text>
+    <rect x="238" y="455" width="160" height="48" rx="4" fill="#111512" stroke="#344034"/>
+    <text x="262" y="485" fill="#F4F7F2">ONE HTTP API</text>
+    <rect x="412" y="455" width="184" height="48" rx="4" fill="#111512" stroke="#344034"/>
+    <text x="434" y="485" fill="#F4F7F2">AGENT-NATIVE</text>
+  </g>
+  <text x="64" y="578" fill="#7E877F" font-family="Menlo" font-size="16" letter-spacing="2">MIT  /  FASTAPI  /  PLAYWRIGHT  /  WHISPER</text>
+  <text x="1110" y="578" fill="#B7FF2A" font-family="Menlo" font-size="16" letter-spacing="2">v0.1</text>
+</svg>

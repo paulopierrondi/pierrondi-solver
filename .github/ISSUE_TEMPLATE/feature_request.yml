@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a focused improvement with an authorized-use case.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Scope check
+      options:
+        - label: This request does not involve 2FA/login bypass, mass account creation, credential abuse, or unauthorized targets.
+          required: true
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What concrete agent or operator problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed outcome
+      description: Describe the smallest useful behavior, not an implementation mandate.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Acceptance evidence
+      description: What test, metric, or live-safe proof would demonstrate success?
+    validations:
+      required: true

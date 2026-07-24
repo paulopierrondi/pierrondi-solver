@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">Pierrondi Labs lockup</title>
+  <desc id="desc">Pierrondi Labs — real products, shipped in public.</desc>
+  <rect width="1280" height="320" rx="28" fill="#050706"/>
+  <path d="M0 1h1280" stroke="#B7FF2A" stroke-width="10"/>
+  <g transform="translate(72 64) scale(.375)">
+    <rect width="512" height="512" rx="72" fill="#0B0E0C"/>
+    <rect x="1" y="1" width="510" height="510" rx="71" fill="none" stroke="#273026" stroke-width="3"/>
+    <path d="M136 392V120h112c82 0 132 40 132 108 0 69-50 110-132 110h-50v54h-62zm62-112h47c48 0 72-17 72-52 0-34-24-50-72-50h-47v102z" fill="#F4F7F2"/>
+    <path d="M347 90L177 422" stroke="#B7FF2A" stroke-width="26" stroke-linecap="square"/>
+  </g>
+  <text x="316" y="145" fill="#F4F7F2" font-family="Arial" font-size="76" font-weight="700" letter-spacing="-2">PIERRONDI</text>
+  <text x="318" y="201" fill="#B7FF2A" font-family="Menlo" font-size="29" letter-spacing="6">/ LABS</text>
+  <path d="M318 230h820" stroke="#273026"/>
+  <text x="318" y="274" fill="#98A099" font-family="Menlo" font-size="20" letter-spacing="3">REAL PRODUCTS. SHIPPED IN PUBLIC.</text>
+</svg>

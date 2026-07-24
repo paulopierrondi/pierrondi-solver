@@ -1,0 +1,6 @@
+# Default ownership for the public repository.
+* @paulopierrondi
+
+/src/ @paulopierrondi
+/hooks/ @paulopierrondi
+/.github/ @paulopierrondi

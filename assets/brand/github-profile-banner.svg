@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img" aria-labelledby="title desc">
+  <title id="title">Pierrondi Labs GitHub profile banner</title>
+  <desc id="desc">Build systems. Ship products. Show the proof.</desc>
+  <defs>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#162016" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" x2="1">
+      <stop offset="0" stop-color="#050706"/>
+      <stop offset=".76" stop-color="#050706"/>
+      <stop offset="1" stop-color="#10170D"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="28" fill="url(#fade)"/>
+  <rect width="1280" height="320" rx="28" fill="url(#grid)" opacity=".72"/>
+  <path d="M0 4h1280" stroke="#B7FF2A" stroke-width="8"/>
+  <g transform="translate(72 55) scale(.41)">
+    <path d="M136 392V120h112c82 0 132 40 132 108 0 69-50 110-132 110h-50v54h-62zm62-112h47c48 0 72-17 72-52 0-34-24-50-72-50h-47v102z" fill="#F4F7F2"/>
+    <path d="M347 90L177 422" stroke="#B7FF2A" stroke-width="26" stroke-linecap="square"/>
+  </g>
+  <text x="300" y="104" fill="#B7FF2A" font-family="Menlo" font-size="20" letter-spacing="5">PIERRONDI / LABS</text>
+  <text x="300" y="174" fill="#F4F7F2" font-family="Arial" font-size="48" font-weight="700" letter-spacing="-1">BUILD SYSTEMS. SHIP PRODUCTS.</text>
+  <text x="300" y="230" fill="#F4F7F2" font-family="Arial" font-size="48" font-weight="700" letter-spacing="-1">SHOW THE PROOF.</text>
+  <text x="303" y="274" fill="#8D968D" font-family="Menlo" font-size="17" letter-spacing="2.5">AI AGENTS  /  AUTOMATION  /  OPEN SOURCE  /  APPS</text>
+  <path d="M1138 64v192M1186 64v192" stroke="#F4F7F2" stroke-width="8"/>
+  <path d="M1084 205h78l24-84 24 55h54" fill="none" stroke="#B7FF2A" stroke-width="8"/>
+</svg>

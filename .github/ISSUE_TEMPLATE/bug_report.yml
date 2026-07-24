@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible defect in the service, client, or provider chain.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Safety checks
+      options:
+        - label: This report is about an authorized QA/testing or automation workflow.
+          required: true
+        - label: I removed API keys, tokens, cookies, credentials, and private URLs.
+          required: true
+        - label: I ran `pierrondi-solve doctor` and reviewed existing issues.
+          required: true
+  - type: input
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Challenge type
+      options:
+        - reCAPTCHA v2
+        - reCAPTCHA v3
+        - hCaptcha
+        - Turnstile
+        - Cloudflare interstitial
+        - Service / telemetry / CLI
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Include expected behavior, observed behavior, and a minimal safe reproduction.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Redacted diagnostics
+      description: Paste safe `doctor` output and relevant structured error reasons.
+      render: shell

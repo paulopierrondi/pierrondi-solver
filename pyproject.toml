@@ -1,12 +1,38 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pierrondi-solver"
 version = "0.1.0"
 description = "Self-hosted CAPTCHA-solving service (reCAPTCHA v2 audio/image, v3 score mitigation) with commercial fallbacks"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Paulo Pierrondi"},
+]
 requires-python = ">=3.11"
+keywords = [
+    "ai-agents",
+    "browser-automation",
+    "captcha",
+    "cloudflare",
+    "fastapi",
+    "playwright",
+    "recaptcha",
+    "self-hosted",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
@@ -16,6 +42,12 @@ dependencies = [
 
 [project.scripts]
 pierrondi-solve = "pierrondi_solver.client:main"
+
+[project.urls]
+Homepage = "https://github.com/paulopierrondi/pierrondi-solver"
+Documentation = "https://github.com/paulopierrondi/pierrondi-solver#readme"
+Issues = "https://github.com/paulopierrondi/pierrondi-solver/issues"
+Repository = "https://github.com/paulopierrondi/pierrondi-solver.git"
 
 [project.optional-dependencies]
 local-solve = [

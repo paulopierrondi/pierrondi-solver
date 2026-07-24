@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Pierrondi Labs mark</title>
+  <desc id="desc">A precision-built letter P crossed by a signal-lime slash.</desc>
+  <defs>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#182018" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="72" fill="#050706"/>
+  <rect x="1" y="1" width="510" height="510" rx="71" fill="none" stroke="#273026" stroke-width="2"/>
+  <rect x="1" y="1" width="510" height="510" rx="71" fill="url(#grid)" opacity=".7"/>
+  <path d="M136 392V120h112c82 0 132 40 132 108 0 69-50 110-132 110h-50v54h-62zm62-112h47c48 0 72-17 72-52 0-34-24-50-72-50h-47v102z" fill="#F4F7F2"/>
+  <path d="M347 90L177 422" stroke="#B7FF2A" stroke-width="26" stroke-linecap="square"/>
+  <circle cx="347" cy="90" r="9" fill="#B7FF2A"/>
+  <circle cx="177" cy="422" r="9" fill="#B7FF2A"/>
+</svg>

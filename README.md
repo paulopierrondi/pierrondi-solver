@@ -1,106 +1,346 @@
-# pierrondi-solver
+<p align="center">
+  <img src="assets/brand/github-social-preview.jpg" width="100%" alt="Pierrondi Solver — self-hosted challenge resolution for AI agents">
+</p>
 
-**Self-hosted CAPTCHA + Cloudflare solving service, built for AI agents.**
-Local-first ($0/solve), with automatic commercial fallback, circuit breaker, and cost telemetry.
+<p align="center">
+  <strong>The local-first verification layer for authorized AI-agent workflows.</strong><br>
+  One HTTP API for reCAPTCHA, Cloudflare clearance, commercial failover, circuit breaking, and cost telemetry.
+</p>
 
-```
-POST /solve  { "type": "recaptcha_v2|recaptcha_v3|hcaptcha|turnstile|cloudflare",
-               "sitekey": "...", "page_url": "..." }
-200 { "token": "...", "strategy": "v2_audio", "provider": "pierrondi", "cost_usd": 0.0,
-      "extra": { "cookies": {"cf_clearance": "..."}, "user_agent": "..." } }
-422 { "error": "unsolved", "reason": "...", "fallback_recommended": true }
-```
+<p align="center">
+  <a href="https://github.com/paulopierrondi/pierrondi-solver/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/paulopierrondi/pierrondi-solver/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-F4F7F2?labelColor=050706">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/License-MIT-B7FF2A?labelColor=050706"></a>
+  <img alt="Local first" src="https://img.shields.io/badge/Local_path-%240%2Fsolve-B7FF2A?labelColor=050706">
+  <img alt="Agent native" src="https://img.shields.io/badge/Interface-Agent--native-F4F7F2?labelColor=050706">
+</p>
 
-## Why this exists
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#watch-a-real-solve">Live proof</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="COMPARISON.md">Comparison</a> ·
+  <a href="docs/BRAND.md">Brand system</a>
+</p>
 
-Existing tools solve **one** problem each: FlareSolverr does Cloudflare clearance but no CAPTCHA tokens,
-whisper-based repos do reCAPTCHA v2 but no Cloudflare, commercial SDKs cost money per call with no local tier.
-**pierrondi-solver is the only one that unifies all of it behind one HTTP API**, designed from day one to be
-called by AI coding agents (Claude Code, Codex, Cursor, custom bots) without human babysitting.
+---
 
-## What it solves
+## Agents should not stop at verification walls
 
-| Challenge | Local strategy ($0) | Commercial fallback | Status |
-|---|---|---|---|
-| reCAPTCHA v2 | Audio challenge → **faster-whisper** on CPU | CapSolver / 2Captcha / CapMonster | ✅ validated live (Google demo, ~14s) |
-| Cloudflare IUAM ("Just a moment") | Stealth Chromium harvests **`cf_clearance`** + UA | CapSolver `AntiCloudflareTask` (needs residential proxy) | ✅ validated live (~5s) |
-| Turnstile / hCaptcha | — | ✅ wired | ready (needs API key) |
-| reCAPTCHA v3 | Honest by design: v3 is **score-based**, no token — mitigation guidance | ✅ wired | documented |
+A long-running agent can browse, call tools, and recover from API failures—then
+lose the entire run when a CAPTCHA or Cloudflare interstitial appears.
+`pierrondi-solver` turns that interruption into infrastructure:
 
-## The differentiators (vs FlareSolverr, uncaptcha, whisper repos)
+1. detect the challenge;
+2. try the local `$0` path;
+3. fail over through configured commercial providers;
+4. isolate degraded providers;
+5. return a token or a structured reason;
+6. record success, latency, and approximate cost.
 
-1. **Provider cascade with circuit breaker** — `pierrondi (local, $0) → capsolver → 2captcha → capmonster`.
-   A provider opens its breaker at >30% failures/hour and the chain skips it automatically.
-2. **Cost + success telemetry built in** — every attempt logged to SQLite (tokens stored only as truncated
-   hashes), exposed at `GET /metrics` with per-provider success rate, latency and USD cost.
-3. **Agent-native** — ships a client CLI (`pierrondi-solve detect|solve|health|doctor`), an HTML challenge
-   detector (extracts sitekey / classifies CF interstitial vs Turnstile), and a ready Claude Code
-   `PostToolUse` hook that auto-solves challenges found in tool output **without asking the human**.
-4. **Honest engineering** — reCAPTCHA v3 is documented as score-based (no fake "v3 solving");
-   image-tile strategy ships as an explicit stub instead of silent failure; unsolved responses carry
-   structured reasons for every attempt.
-5. **`doctor` self-audit** — one command checks env, service, LaunchAgent, deps, chromium binary and
-   key presence (never values).
+No provider-specific logic leaks into the agent.
+
+| Local-first | One contract | Resilient | Observable |
+| --- | --- | --- | --- |
+| Audio + Whisper and Chromium clearance paths | `POST /solve` for every supported challenge | Cascade plus per-provider circuit breaker | SQLite metrics without storing raw tokens |
+
+## Watch a real solve
+
+<a href="https://x.com/paulopierrondi/status/2080296081775030700">
+  <img src="assets/media/live-demo-contact-sheet.jpg" width="100%" alt="Contact sheet from a real Pierrondi Solver reCAPTCHA v2 solve">
+</a>
+
+The launch demo records a real Google reCAPTCHA v2 challenge resolved locally
+in **10.6 seconds** at **$0.00 local provider cost**. The demo and the repository
+are separate proof surfaces: the video shows the product working; the tests show
+the contracts remain stable.
+
+> [Watch the full product demo on X →](https://x.com/paulopierrondi/status/2080296081775030700)
 
 ## Quickstart
 
+### Full local path
+
 ```bash
-python3.11 -m venv .venv && source .venv/bin/activate
+git clone https://github.com/paulopierrondi/pierrondi-solver.git
+cd pierrondi-solver
+
+python3.11 -m venv .venv
+source .venv/bin/activate
 pip install -e '.[dev,local-solve]'
 playwright install chromium
+
 uvicorn pierrondi_solver.main:app --port 8791 --app-dir src
 ```
 
+In another terminal:
+
 ```bash
-# one-shot stack audit
 pierrondi-solve doctor
-
-# detect a challenge in saved HTML
-pierrondi-solve detect --html-file page.html --url https://example.com
-
-# solve via the service
-pierrondi-solve solve --type recaptcha_v2 --sitekey 6Lc... --url https://example.com/form
+pierrondi-solve health
 ```
 
-Python client:
+### First request
+
+```bash
+curl -s http://127.0.0.1:8791/solve \
+  -H 'content-type: application/json' \
+  -d '{
+    "type": "recaptcha_v2",
+    "sitekey": "YOUR_AUTHORIZED_TEST_SITEKEY",
+    "page_url": "https://your-authorized-test-page.example",
+    "lane": "default"
+  }'
+```
+
+Success:
+
+```json
+{
+  "token": "…",
+  "strategy": "v2_audio",
+  "provider": "pierrondi",
+  "latency_ms": 10600,
+  "cost_usd": 0.0,
+  "extra": {}
+}
+```
+
+Unsolved paths remain inspectable:
+
+```json
+{
+  "error": "unsolved",
+  "reason": "pierrondi/v2_audio: audio_unavailable; capsolver: no_api_key",
+  "fallback_recommended": true,
+  "attempts": ["…"]
+}
+```
+
+## What it handles
+
+| Challenge | Local path | Commercial fallback | Current behavior |
+| --- | --- | --- | --- |
+| reCAPTCHA v2 | Audio challenge → `faster-whisper` on CPU | CapSolver, 2Captcha, CapMonster | Live-validated |
+| Cloudflare interstitial / IUAM | Stealth Chromium harvests `cf_clearance` + user agent | CapSolver `AntiCloudflareTask` with proxy | Live-validated |
+| Turnstile | — | CapSolver, 2Captcha, CapMonster | Wired |
+| hCaptcha | — | CapSolver, 2Captcha, CapMonster | Wired |
+| reCAPTCHA v3 | Honest local mitigation guidance; v3 is score-based | CapSolver, 2Captcha, CapMonster | Wired with explicit limits |
+
+The image-tile strategy is an explicit stub. It cannot fail silently or pretend
+to support a path that is not implemented.
+
+## How the cascade works
+
+```mermaid
+flowchart LR
+    A["Agent / browser tool"] --> B["detect_challenge"]
+    B --> C["POST /solve"]
+    C --> D["Local strategies — $0"]
+    D -->|unsolved| E["CapSolver"]
+    E -->|unsolved| F["2Captcha"]
+    F -->|unsolved| G["CapMonster"]
+    D --> H["First solved result"]
+    E --> H
+    F --> H
+    G --> H
+    C --> I["Circuit breaker"]
+    C --> J["SQLite telemetry"]
+```
+
+The default provider order is:
+
+```text
+pierrondi → capsolver → 2captcha → capmonster
+```
+
+A provider is skipped when its circuit is open. Missing keys, missing optional
+dependencies, and explicit stubs do not burn breaker budget.
+
+Read the full [architecture and failure model](docs/ARCHITECTURE.md).
+
+## Agent-native interfaces
+
+### CLI
+
+```bash
+# detect a challenge in captured HTML
+pierrondi-solve detect \
+  --html-file page.html \
+  --url https://your-authorized-test-page.example
+
+# request a solve
+pierrondi-solve solve \
+  --type recaptcha_v2 \
+  --sitekey YOUR_AUTHORIZED_TEST_SITEKEY \
+  --url https://your-authorized-test-page.example
+
+# audit service, dependencies, browser, and configuration
+pierrondi-solve doctor
+```
+
+### Python
 
 ```python
 from pierrondi_solver.client import Challenge, solve_verbose
-result = solve_verbose(Challenge("cloudflare", "", "https://protected-site.com"))
+
+result = solve_verbose(
+    Challenge("cloudflare", "", "https://your-authorized-property.example")
+)
+
 if result["solved"]:
     cookie = result["extra"]["cookies"]["cf_clearance"]
-    ua = result["extra"]["user_agent"]      # reuse cookie + UA from the same IP
+    user_agent = result["extra"]["user_agent"]
+    # Reuse cookie + user agent from the same IP.
 ```
 
-## Config (env only — secrets never in files)
+### Claude Code hook
 
-| Var | Default | Purpose |
-|---|---|---|
-| `PIERRONDI_SOLVER_URL` | `http://127.0.0.1:8791` | client-side endpoint |
-| `CAPTCHA_PROVIDER` | `auto` | `auto` = local → capsolver → 2captcha → capmonster, or pin one |
-| `CAPSOLVER_API_KEY` / `TWOCAPTCHA_API_KEY` / `CAPMONSTER_API_KEY` | — | commercial fallback keys |
-| `CAPSOLVER_PROXY` | — | residential proxy (required for `AntiCloudflareTask`) |
-| `SOLVER_BREAKER_FAILURE_RATE` | `0.30` | circuit-breaker threshold |
+[`hooks/captcha_posttool_hook.py`](hooks/captcha_posttool_hook.py) is a
+`PostToolUse` hook for browser-like tool output. It detects known markers,
+extracts a sitekey when available, and gives the agent a structured instruction
+to resolve the interruption without interrupting the operator.
 
-## Claude Code auto-solve hook
+See the [hook setup example](examples/claude-code-hook.md).
 
-`hooks/captcha_posttool_hook.py` — register it as a `PostToolUse` hook; when a browser tool's output
-contains CAPTCHA/Cloudflare markers, the agent gets the solve instruction (with the sitekey already
-extracted) and resolves silently. See `examples/claude-code-hook.md`.
+## API
 
-## Tests
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Service status and configured provider order |
+| `GET` | `/metrics?window_s=86400` | Success, latency, and cost by provider |
+| `POST` | `/solve` | Typed challenge request and first-success result |
+
+Cloudflare interstitials have no sitekey. Their successful response includes:
+
+```json
+{
+  "extra": {
+    "cookies": {"cf_clearance": "…"},
+    "user_agent": "…"
+  }
+}
+```
+
+The cookie, user agent, and originating IP are a single clearance context.
+
+## Observability by default
+
+Every runnable attempt records:
+
+- provider and strategy;
+- challenge type and site host;
+- lane;
+- success;
+- latency;
+- approximate USD cost;
+- structured reason;
+- a 12-character SHA-256 token fingerprint.
+
+Raw tokens are not stored.
 
 ```bash
-pytest -q     # 61 tests: breaker, telemetry, chain, API contract, client, hook, strategies
+curl -s 'http://127.0.0.1:8791/metrics?window_s=86400'
 ```
+
+```json
+{
+  "window_s": 86400,
+  "attempts": 12,
+  "solved": 10,
+  "by_provider": {
+    "pierrondi": {
+      "attempts": 9,
+      "solved": 8,
+      "cost_usd": 0.0,
+      "avg_latency_ms": 11820,
+      "success_rate": 0.8889
+    }
+  }
+}
+```
+
+## Configuration
+
+Secrets are environment-only. The repository stores names and instructions,
+never values.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PIERRONDI_SOLVER_URL` | `http://127.0.0.1:8791` | Client endpoint |
+| `PIERRONDI_SOLVER_DB` | `data/telemetry.db` | SQLite telemetry path |
+| `CAPTCHA_PROVIDER` | `auto` | Use the cascade or pin one provider |
+| `CAPSOLVER_API_KEY` | — | CapSolver fallback |
+| `TWOCAPTCHA_API_KEY` | — | 2Captcha fallback |
+| `CAPMONSTER_API_KEY` | — | CapMonster fallback |
+| `CAPSOLVER_PROXY` | — | Proxy required for CapSolver Cloudflare tasks |
+| `SOLVER_BREAKER_FAILURE_RATE` | `0.30` | Breaker threshold |
+| `SOLVER_BREAKER_MIN_SAMPLES` | `5` | Samples before opening |
+| `SOLVER_BREAKER_WINDOW_S` | `3600` | Sliding window |
+
+Read [Getting provider keys](docs/GETTING_KEYS.md) without placing them in the
+repository.
+
+## Test suite
+
+```bash
+pip install -e '.[dev]'
+pytest -q
+```
+
+The suite covers the API contract, provider chain, breaker, telemetry, client,
+challenge detection, hook, Cloudflare handling, commercial adapters, and
+`doctor`. Live browser/network solves use the `live` marker and stay outside CI.
+
+## Documentation
+
+| Document | Read it for |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Flow, components, data handling, failure model |
+| [Getting keys](docs/GETTING_KEYS.md) | Commercial provider setup |
+| [Comparison](COMPARISON.md) | Trade-offs against focused alternatives |
+| [Brand system](docs/BRAND.md) | `PIERRONDI / LABS` visual and verbal identity |
+| [GitHub profile kit](docs/GITHUB_PROFILE.md) | Copy-ready portfolio profile and repo standard |
+| [Contributing](CONTRIBUTING.md) | Development and contribution contract |
+| [Security](SECURITY.md) | Private reporting and security properties |
+| [Support](SUPPORT.md) | Diagnostics and safe issue reporting |
+| [Changelog](CHANGELOG.md) | Version history |
 
 ## Responsible use
 
-This project is for **your own accounts, QA/testing and authorized automation**. Solving CAPTCHAs may
-violate target sites' Terms of Service. Never use it against third-party sites you don't control,
-for mass account creation, or to bypass 2FA/login walls — the service refuses those flows by policy.
-Commercial-solver pricing shown in telemetry is approximate.
+This project is for accounts, properties, QA environments, and automation flows
+you own or are explicitly authorized to operate.
+
+Do not use it for:
+
+- third-party targets without authorization;
+- mass account creation;
+- credential abuse;
+- login-wall or 2FA bypass;
+- fingerprint evasion or anti-ban systems;
+- any workflow that violates applicable law or a target's Terms of Service.
+
+Structured refusal and escalation are features, not missing polish.
+
+## Contributing
+
+Focused issues and pull requests are welcome. Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md), use the issue forms, and keep examples
+redacted.
+
+Security-sensitive findings belong in
+[private vulnerability reporting](https://github.com/paulopierrondi/pierrondi-solver/security/advisories/new).
+
+## The maker system
+
+`pierrondi-solver` is published under **PIERRONDI / OPEN SOURCE LABS**:
+
+> Build systems. Ship products. Show the proof.
+
+The full, reusable portfolio identity—naming, voice, colors, typography, asset
+rules, and cross-product extension logic—is documented in
+[`docs/BRAND.md`](docs/BRAND.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT © Paulo Pierrondi. See [`LICENSE`](LICENSE).
