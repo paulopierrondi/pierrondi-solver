@@ -8,12 +8,48 @@ def req(challenge_type=ChallengeType.recaptcha_v2):
     return SolveRequest(type=challenge_type, sitekey="k", page_url="https://example.com")
 
 
-def test_v3_never_returns_token():
+def test_v3_missing_deps_reports(monkeypatch):
+    monkeypatch.setattr(
+        "pierrondi_solver.strategies.recaptcha_v3._missing_deps",
+        lambda: ["playwright"],
+    )
     strategy = RecaptchaV3Strategy()
     outcome = strategy.solve(req(ChallengeType.recaptcha_v3))
     assert outcome.solved is False
-    assert "score_based" in outcome.reason
-    assert outcome.reason == V3_MITIGATION
+    assert outcome.reason.startswith("deps_missing")
+    assert outcome.cost_usd == 0.0
+
+
+def test_v3_harvest_success(monkeypatch):
+    monkeypatch.setattr(
+        RecaptchaV3Strategy, "_harvest_token", lambda self, url, sitekey, timeout: "tok-v3"
+    )
+    outcome = RecaptchaV3Strategy().solve(req(ChallengeType.recaptcha_v3))
+    assert outcome.solved is True
+    assert outcome.token == "tok-v3"
+    assert outcome.cost_usd == 0.0
+    assert "score_note" in outcome.extra
+
+
+def test_v3_harvest_failure_keeps_guidance(monkeypatch):
+    monkeypatch.setattr(
+        RecaptchaV3Strategy,
+        "_harvest_token",
+        lambda self, url, sitekey, timeout: "",
+    )
+    outcome = RecaptchaV3Strategy().solve(req(ChallengeType.recaptcha_v3))
+    assert outcome.solved is False
+    assert outcome.reason == "v3_no_token_within_timeout"
+
+
+def test_v3_harvest_exception_reports_reason(monkeypatch):
+    def boom(self, url, sitekey, timeout):
+        raise RuntimeError("no grecaptcha")
+
+    monkeypatch.setattr(RecaptchaV3Strategy, "_harvest_token", boom)
+    outcome = RecaptchaV3Strategy().solve(req(ChallengeType.recaptcha_v3))
+    assert outcome.solved is False
+    assert outcome.reason.startswith("v3_harvest_failed: RuntimeError")
 
 
 def test_v3_supports_only_v3():
