@@ -1,0 +1,37 @@
+name: Go client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "clients/go/**"
+      - ".github/workflows/go-client.yml"
+  pull_request:
+    paths:
+      - "clients/go/**"
+      - ".github/workflows/go-client.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Go client (vet + race)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Vet
+        working-directory: clients/go
+        run: go vet ./...
+
+      - name: Test with race detector
+        working-directory: clients/go
+        run: go test -race -count=1 ./...
