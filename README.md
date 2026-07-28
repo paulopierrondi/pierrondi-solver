@@ -123,12 +123,27 @@ Unsolved paths remain inspectable:
 | --- | --- | --- | --- |
 | reCAPTCHA v2 | Audio challenge → `faster-whisper` on CPU; **image-tile via pluggable vision classifier** (`register_classifier`) | CapSolver, 2Captcha, CapMonster | Live-validated |
 | Cloudflare interstitial / IUAM | Stealth Chromium, Firefox, nodriver, **or camoufox** (hardened Firefox) harvests `cf_clearance` + user agent | CapSolver `AntiCloudflareTask` with proxy | Live-validated |
-| Turnstile | — | CapSolver, 2Captcha, CapMonster | Wired |
+| Turnstile | Stealth Chromium harvests `cf-turnstile-response` | CapSolver, 2Captcha, CapMonster | Live-validated |
 | hCaptcha | **Accessibility cookie → audio challenge → `faster-whisper`** | CapSolver, 2Captcha, CapMonster | Local path wired |
-| reCAPTCHA v3 | Honest local mitigation guidance; v3 is score-based | CapSolver, 2Captcha, CapMonster | Wired with explicit limits |
+| reCAPTCHA v3 | Stealth Chromium executes `grecaptcha.execute` and returns the real token (score caveat in `extra.score_note`) | CapSolver, 2Captcha, CapMonster | Live-validated |
 
 The image-tile strategy is an explicit stub. It cannot fail silently or pretend
 to support a path that is not implemented.
+
+## Passive WAF detection
+
+`pierrondi_solver.waf` classifies the protection present on a page from
+passive signals (body/headers) and routes it: Cloudflare → the solver's own
+clearance path; DataDome, Queue-it, PerimeterX/HUMAN, Akamai → `stop`.
+Detection never means evasion.
+
+## Clients
+
+- **Go**: `clients/go` — typed `solverclient` with local validation,
+  artifact-policy enforcement, bounded reads, redacted errors and zero
+  implicit retry.
+- **Live battery**: `examples/solve_matrix.sh` runs v2/v3/hcaptcha/turnstile
+  against the providers' official demo pages.
 
 ## How the cascade works
 

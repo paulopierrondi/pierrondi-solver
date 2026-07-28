@@ -13,6 +13,7 @@ from .strategies.hcaptcha import HCaptchaAudioStrategy
 from .strategies.recaptcha_v2_audio import RecaptchaV2AudioStrategy
 from .strategies.recaptcha_v2_image import RecaptchaV2ImageStrategy
 from .strategies.recaptcha_v3 import RecaptchaV3Strategy
+from .strategies.turnstile import TurnstileStrategy
 from .telemetry import Telemetry
 
 NO_API_KEY = "no_api_key"
@@ -44,6 +45,7 @@ class SolverChain:
                     RecaptchaV2AudioStrategy(),
                     RecaptchaV2ImageStrategy(),
                     RecaptchaV3Strategy(),
+                    TurnstileStrategy(),
                     HCaptchaAudioStrategy(
                         accessibility_cookie=config.hcaptcha_accessibility_cookie
                     ),
