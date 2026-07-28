@@ -27,6 +27,19 @@ class Config:
     breaker_failure_rate: float = 0.30
     breaker_min_samples: int = 5
     breaker_window_s: int = 3600
+    # Browser engine used by local clearance strategies (e.g. Cloudflare).
+    # Default "chromium" reproduces the original behavior. Other engines
+    # ("firefox", and later camoufox/nodriver/patchright) are opt-in.
+    browser_engine: str = "chromium"
+    # Proxy connect string for the clearance harvest. When set, the browser
+    # backend routes through it so cf_clearance binds to a controlled IP.
+    proxy: str = ""
+    proxy_endpoint: str = ""
+    proxy_sticky: bool = False
+    proxy_sticky_ttl: int = 600
+    # hCaptcha accessibility cookie enabling the local audio path. Optional;
+    # when unset the hcaptcha local strategy reports deps_missing.
+    hcaptcha_accessibility_cookie: str = ""
 
     def chain(self) -> list[str]:
         if self.provider == "auto":
@@ -48,4 +61,11 @@ def load_config(env: dict | None = None) -> Config:
         breaker_failure_rate=float(env.get("SOLVER_BREAKER_FAILURE_RATE", "0.30")),
         breaker_min_samples=int(env.get("SOLVER_BREAKER_MIN_SAMPLES", "5")),
         breaker_window_s=int(env.get("SOLVER_BREAKER_WINDOW_S", "3600")),
+        browser_engine=env.get("SOLVER_BROWSER_ENGINE", "chromium").strip().lower(),
+        proxy=env.get("SOLVER_PROXY", "").strip(),
+        proxy_endpoint=env.get("SOLVER_PROXY_ENDPOINT", "").strip(),
+        proxy_sticky=env.get("SOLVER_PROXY_STICKY", "").strip().lower()
+        in ("1", "true", "yes"),
+        proxy_sticky_ttl=int(env.get("SOLVER_PROXY_STICKY_TTL", "600")),
+        hcaptcha_accessibility_cookie=env.get("HCAPTCHA_ACCESSIBILITY_COOKIE", "").strip(),
     )

@@ -121,11 +121,11 @@ Unsolved paths remain inspectable:
 
 | Challenge | Local path | Commercial fallback | Current behavior |
 | --- | --- | --- | --- |
-| reCAPTCHA v2 | Audio challenge → `faster-whisper` on CPU | CapSolver, 2Captcha, CapMonster | Live-validated |
-| Cloudflare interstitial / IUAM | Stealth Chromium harvests `cf_clearance` + user agent | CapSolver `AntiCloudflareTask` with proxy | Live-validated |
+| reCAPTCHA v2 | Audio challenge → `faster-whisper` on CPU; **image-tile via pluggable vision classifier** (`register_classifier`) | CapSolver, 2Captcha, CapMonster | Live-validated |
+| Cloudflare interstitial / IUAM | Stealth Chromium, Firefox, nodriver, **or camoufox** (hardened Firefox) harvests `cf_clearance` + user agent | CapSolver `AntiCloudflareTask` with proxy | Live-validated |
 | Turnstile | Stealth Chromium harvests `cf-turnstile-response` | CapSolver, 2Captcha, CapMonster | Live-validated |
+| hCaptcha | **Accessibility cookie → audio challenge → `faster-whisper`** | CapSolver, 2Captcha, CapMonster | Local path wired |
 | reCAPTCHA v3 | Stealth Chromium executes `grecaptcha.execute` and returns the real token (score caveat in `extra.score_note`) | CapSolver, 2Captcha, CapMonster | Live-validated |
-| hCaptcha | Audio challenge → `faster-whisper` (free accessibility cookie) | CapSolver, 2Captcha, CapMonster | Wired |
 
 The image-tile strategy is an explicit stub. It cannot fail silently or pretend
 to support a path that is not implemented.
@@ -218,6 +218,20 @@ to resolve the interruption without interrupting the operator.
 
 See the [hook setup example](examples/claude-code-hook.md).
 
+### MCP server (Codex, Gemini, Antigravity, Claude Code)
+
+The official MCP server exposes the solver as native tools so any MCP-compatible
+agent or coder can detect and solve challenges without pasting solver code.
+
+```bash
+pip install -e '.[mcp]'
+pierrondi-solver-mcp   # stdio server
+```
+
+Tools: `solve_challenge`, `detect_challenge`, `get_browser_session`,
+`service_health`, `service_doctor`. Point any MCP client at the command above.
+Full setup and client config: [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
+
 ## API
 
 | Method | Route | Purpose |
@@ -292,6 +306,12 @@ never values.
 | `SOLVER_BREAKER_FAILURE_RATE` | `0.30` | Breaker threshold |
 | `SOLVER_BREAKER_MIN_SAMPLES` | `5` | Samples before opening |
 | `SOLVER_BREAKER_WINDOW_S` | `3600` | Sliding window |
+| `SOLVER_BROWSER_ENGINE` | `chromium` | Local clearance engine (`chromium`, `firefox`, `nodriver`, `camoufox`) |
+| `SOLVER_PROXY` | — | Proxy connect string for clearance harvest (binds `cf_clearance` to a controlled IP) |
+| `SOLVER_PROXY_ENDPOINT` | — | Rotating/sticky proxy provider endpoint (residential) |
+| `SOLVER_PROXY_STICKY` | — | `1` to cache proxy per session key within `SOLVER_PROXY_STICKY_TTL` |
+| `SOLVER_PROXY_STICKY_TTL` | `600` | Sticky proxy lifetime in seconds |
+| `HCAPTCHA_ACCESSIBILITY_COOKIE` | — | Enables the hCaptcha local audio path |
 
 Read [Getting provider keys](docs/GETTING_KEYS.md) without placing them in the
 repository.
@@ -312,6 +332,7 @@ challenge detection, hook, Cloudflare handling, commercial adapters, and
 | Document | Read it for |
 | --- | --- |
 | [Architecture](docs/ARCHITECTURE.md) | Flow, components, data handling, failure model |
+| [MCP server](docs/MCP_SERVER.md) | Expose the solver as tools to any MCP-compatible agent/coder |
 | [Getting keys](docs/GETTING_KEYS.md) | Commercial provider setup |
 | [Comparison](COMPARISON.md) | Trade-offs against focused alternatives |
 | [Brand system](docs/BRAND.md) | `PIERRONDI / LABS` visual and verbal identity |

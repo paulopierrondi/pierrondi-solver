@@ -42,6 +42,7 @@ dependencies = [
 
 [project.scripts]
 pierrondi-solve = "pierrondi_solver.client:main"
+pierrondi-solver-mcp = "pierrondi_solver.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/paulopierrondi/pierrondi-solver"
@@ -53,6 +54,15 @@ Repository = "https://github.com/paulopierrondi/pierrondi-solver.git"
 local-solve = [
     "playwright>=1.44",
     "faster-whisper>=1.0",
+]
+nodriver = [
+    "nodriver>=0.39",
+]
+mcp = [
+    "mcp>=1.2,<2",
+]
+camoufox = [
+    "camoufox>=0.4",
 ]
 dev = [
     "pytest>=8.0",

@@ -6,65 +6,76 @@ The solve = (cf_clearance cookie value, the exact User-Agent used) — the
 caller MUST reuse both together for subsequent requests (the clearance is
 bound to UA + IP).
 
-Local strategy: real Chromium via Playwright with automation flags off,
-navigate, wait for the cf_clearance cookie (up to timeout), harvest it.
+The browser engine is pluggable via ``BrowserBackend`` (see ``browser/``).
+The default backend is Chromium (backward compatible). Other engines
+(Firefox, and later camoufox/nodriver/patchright) can be injected or
+selected via ``SOLVER_BROWSER_ENGINE``.
 
-Heavy dep (playwright) is optional/lazy: missing -> ``deps_missing`` so the
-chain falls through to commercial providers (CapSolver AntiCloudflareTask,
-which requires a proxy).
+Heavy deps (playwright) are optional/lazy: a backend reports ``deps_missing``
+and the chain falls through to commercial providers (CapSolver
+AntiCloudflareTask, which requires a proxy).
 """
 from __future__ import annotations
 
 import time
 
+from ..browser import ChromiumBackend, get_browser
+from ..browser.base import BrowserBackend, BrowserOpts
 from ..models import ChallengeType, SolveRequest, StrategyOutcome
+from ..proxy import ProxyBackend, ProxyConfig, StaticProxyBackend
 
 CLEARANCE_COOKIE = "cf_clearance"
 
-_LAUNCH_ARGS = [
-    "--disable-blink-features=AutomationControlled",
-    "--no-first-run",
-    "--no-default-browser-check",
-]
 
-_STEALTH_INIT = """
-Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en', 'pt-BR']});
-Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-window.chrome = window.chrome || {runtime: {}};
-"""
-
-
-def _playwright_missing() -> bool:
-    try:
-        import playwright  # noqa: F401
-        return False
-    except ImportError:
-        return True
+def _elapsed_ms(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
 
 
 class CloudflareClearanceStrategy:
     name = "cf_clearance"
     provider = "pierrondi"
 
-    def __init__(self, headless: bool = False) -> None:
+    def __init__(
+        self,
+        headless: bool = False,
+        backend: BrowserBackend | None = None,
+        proxy_backend: ProxyBackend | None = None,
+        proxy_required: bool = False,
+    ) -> None:
         # headful is materially more reliable against managed challenges
         self.headless = headless
+        # default backend keeps current behavior (Chromium) when not injected
+        self.backend: BrowserBackend = backend or ChromiumBackend()
+        self.proxy_backend = proxy_backend or StaticProxyBackend()
+        self.proxy_required = proxy_required
 
     def supports(self, challenge_type: ChallengeType) -> bool:
         return challenge_type == ChallengeType.cloudflare
 
     def solve(self, request: SolveRequest) -> StrategyOutcome:
         started = time.monotonic()
-        if _playwright_missing():
+
+        missing = self.backend.deps_missing()
+        if missing:
             return StrategyOutcome(
                 strategy=self.name,
                 provider=self.provider,
                 latency_ms=_elapsed_ms(started),
-                reason="deps_missing: pip install '.[local-solve]' + playwright install chromium",
+                reason=f"deps_missing: {self.backend.name}: {'; '.join(missing)}",
             )
+
+        proxy_config, proxy_error = self._resolve_proxy(request, started)
+        if proxy_error:
+            return proxy_error
+
+        opts = BrowserOpts(
+            headless=self.headless,
+            proxy=proxy_config.connect_string if proxy_config else "",
+        )
         try:
-            clearance, user_agent = self._harvest_clearance(request)
+            ctx = self.backend.harvest_clearance(
+                request.page_url, request.timeout_s, opts
+            )
         except Exception as exc:
             return StrategyOutcome(
                 strategy=self.name,
@@ -72,55 +83,82 @@ class CloudflareClearanceStrategy:
                 latency_ms=_elapsed_ms(started),
                 reason=f"cf_clearance_failed: {type(exc).__name__}: {exc}"[:400],
             )
-        if not clearance:
+        if not ctx.clearance:
             return StrategyOutcome(
                 strategy=self.name,
                 provider=self.provider,
                 latency_ms=_elapsed_ms(started),
                 reason="cf_clearance_not_granted_within_timeout",
             )
+        extra = {
+            "user_agent": ctx.user_agent,
+            "cookies": {CLEARANCE_COOKIE: ctx.clearance},
+            "engine": ctx.engine,
+            "usage": "send Cookie cf_clearance with the SAME user_agent from the SAME IP",
+        }
+        if proxy_config:
+            extra["proxy"] = {
+                "kind": proxy_config.kind,
+                "fingerprint": proxy_config.fingerprint,
+            }
         return StrategyOutcome(
-            token=clearance,
+            token=ctx.clearance,
             strategy=self.name,
             provider=self.provider,
             latency_ms=_elapsed_ms(started),
             cost_usd=0.0,
-            extra={
-                "user_agent": user_agent,
-                "cookies": {CLEARANCE_COOKIE: clearance},
-                "usage": "send Cookie cf_clearance with the SAME user_agent from the SAME IP",
-            },
+            extra=extra,
         )
 
-    def _harvest_clearance(self, request: SolveRequest) -> tuple[str, str]:
-        from playwright.sync_api import sync_playwright
-
-        deadline = time.monotonic() + request.timeout_s
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=self.headless, args=_LAUNCH_ARGS)
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/126.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1440, "height": 900},
-                locale="en-US",
-            )
-            context.add_init_script(_STEALTH_INIT)
-            page = context.new_page()
-            try:
-                page.goto(request.page_url, wait_until="domcontentloaded",
-                          timeout=min(60_000, request.timeout_s * 1000))
-                while time.monotonic() < deadline:
-                    cookies = {c["name"]: c["value"] for c in context.cookies()}
-                    if cookies.get(CLEARANCE_COOKIE):
-                        return cookies[CLEARANCE_COOKIE], page.evaluate("navigator.userAgent")
-                    page.wait_for_timeout(2000)
-                return "", ""
-            finally:
-                browser.close()
+    def _resolve_proxy(
+        self, request: SolveRequest, started: float
+    ) -> tuple[ProxyConfig | None, StrategyOutcome | None]:
+        proxy_config = self.proxy_backend.resolve(request.lane)
+        reason = ""
+        if self.proxy_required and proxy_config is None:
+            reason = "deps_missing: proxy_unavailable"
+        elif proxy_config and not getattr(self.backend, "supports_proxy", False):
+            reason = f"deps_missing: {self.backend.name}: proxy_not_supported"
+        if not reason:
+            return proxy_config, None
+        return None, StrategyOutcome(
+            strategy=self.name,
+            provider=self.provider,
+            latency_ms=_elapsed_ms(started),
+            reason=reason,
+        )
 
 
-def _elapsed_ms(started: float) -> int:
-    return int((time.monotonic() - started) * 1000)
+def build_cloudflare_strategy(
+    engine: str = "chromium",
+    proxy_backend: ProxyBackend | None = None,
+    proxy_required: bool = False,
+) -> CloudflareClearanceStrategy:
+    """Build the Cloudflare strategy with the backend selected by engine name.
+
+    Unknown engine names fall back to a backend whose ``deps_missing`` reports
+    ``unknown_engine``, so the chain skips it gracefully rather than crashing.
+    ``proxy`` optionally routes the harvest through a controlled IP.
+    """
+    try:
+        backend = get_browser(engine)
+    except ValueError:
+        # Defer the unknown-engine signal to deps_missing via a tiny shim that
+        # always reports the hint; keeps construction total.
+        from ..browser.base import BrowserOpts, HarvestedContext
+
+        class _UnknownBackend:
+            name = "unknown"
+
+            def deps_missing(self) -> list[str]:
+                return [f"unknown_engine: {engine}"]
+
+            def harvest_clearance(self, page_url, timeout_s, opts):  # pragma: no cover
+                raise RuntimeError(f"unknown_engine: {engine}")
+
+        backend = _UnknownBackend()  # type: ignore[assignment]
+    return CloudflareClearanceStrategy(
+        backend=backend,
+        proxy_backend=proxy_backend,
+        proxy_required=proxy_required,
+    )
