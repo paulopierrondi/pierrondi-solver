@@ -34,7 +34,7 @@ Most alternatives deliberately focus on one part of that stack.
 ## Honest weaknesses (ours, today)
 
 - Single-machine service (no queue/proxy pool); high-volume scraping should add workers + proxies.
-- hCaptcha/Turnstile are commercial-only (no local strategy yet).
+- hCaptcha's local path requires the free hCaptcha accessibility cookie; without it, hCaptcha falls back to commercial providers.
 - reCAPTCHA v2 image-tile strategy is an explicit stub (audio covers the common case).
 - Audio challenge can be withheld by Google on flagged IPs → that's exactly why the
   commercial cascade exists (bring your own keys).

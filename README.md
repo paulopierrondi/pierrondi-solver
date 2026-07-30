@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>The local-first verification layer for authorized AI-agent workflows.</strong><br>
-  One HTTP API for reCAPTCHA, Cloudflare clearance, commercial failover, circuit breaking, and cost telemetry.
+  One HTTP API for reCAPTCHA v2/v3, hCaptcha, Turnstile and Cloudflare clearance — local $0 first, commercial failover, proxy identity, MCP tools, and typed clients.
 </p>
 
 <p align="center">
