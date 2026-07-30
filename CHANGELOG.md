@@ -7,6 +7,45 @@ and the project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-28
+
+### Added
+
+- **Go client** (`clients/go`, package `solverclient`): typed contract for
+  `POST /solve` and `GET /health` with local validation, artifact-policy
+  enforcement, bounded reads, redacted errors and zero implicit retry.
+  Stdlib-only; covered by CI (`go vet` + `go test -race`).
+- **Turnstile local strategy** (`turnstile_harvest`): stealth Chromium reads
+  `cf-turnstile-response` after the widget completes — $0, live-validated
+  against Cloudflare's official demo.
+- **reCAPTCHA v3 local strategy** (`v3_execute`): executes
+  `grecaptcha.execute(sitekey)` in a stealth browser with human-like pacing
+  and returns the real token; the score caveat rides in `extra.score_note`.
+- **Proxy-aware token harvests**: Turnstile and reCAPTCHA v3 honor the same
+  proxy layer as Cloudflare clearance (`SOLVER_PROXY` /
+  `SOLVER_PROXY_ENDPOINT`, static/rotating/sticky), fail closed when a
+  configured proxy is unavailable, and expose only an 8-char fingerprint.
+  New `proxy.playwright_proxy()` helper.
+- **Passive WAF detector** (`pierrondi_solver.waf`): classifies Cloudflare,
+  DataDome, PerimeterX/HUMAN, Akamai and Queue-it from passive signals and
+  routes them (Cloudflare → solver, others → stop). Detection is not evasion.
+- **Live battery** (`examples/solve_matrix.sh`): one-command real-site
+  validation across reCAPTCHA v2/v3, hCaptcha and Turnstile against the
+  providers' official demo pages.
+
+### Changed
+
+- Multi-engine browser backends, MCP server, proxy/identity layer, hCaptcha
+  local audio and pluggable image classifier integrated from the
+  `feat/multi-engine-mcp-proxy-hcaptcha` branch.
+- README: proxy/identity section, WAF detection section, updated support
+  matrix (Turnstile and reCAPTCHA v3 local paths live-validated).
+
+### Fixed
+
+- CI installs the `mcp` extra; `mcp` dependency pinned to `<2` because the
+  PyPI `mcp-2.0.0` release is a different package without `server.fastmcp`.
+
 ### Added
 
 - **Proxy / identity layer** (vetor C): `ProxyConfig`, `IdentityContext`, and
