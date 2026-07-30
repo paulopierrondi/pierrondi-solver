@@ -26,7 +26,7 @@ def test_v3_missing_deps_reports(monkeypatch):
 
 def test_v3_harvest_success(monkeypatch):
     monkeypatch.setattr(
-        RecaptchaV3Strategy, "_harvest_token", lambda self, url, sitekey, timeout: "tok-v3"
+        RecaptchaV3Strategy, "_harvest_token", lambda self, url, sitekey, timeout, proxy="": "tok-v3"
     )
     outcome = RecaptchaV3Strategy().solve(req(ChallengeType.recaptcha_v3))
     assert outcome.solved is True
@@ -39,7 +39,7 @@ def test_v3_harvest_failure_keeps_guidance(monkeypatch):
     monkeypatch.setattr(
         RecaptchaV3Strategy,
         "_harvest_token",
-        lambda self, url, sitekey, timeout: "",
+        lambda self, url, sitekey, timeout, proxy="": "",
     )
     outcome = RecaptchaV3Strategy().solve(req(ChallengeType.recaptcha_v3))
     assert outcome.solved is False
@@ -47,7 +47,7 @@ def test_v3_harvest_failure_keeps_guidance(monkeypatch):
 
 
 def test_v3_harvest_exception_reports_reason(monkeypatch):
-    def boom(self, url, sitekey, timeout):
+    def boom(self, url, sitekey, timeout, proxy=""):
         raise RuntimeError("no grecaptcha")
 
     monkeypatch.setattr(RecaptchaV3Strategy, "_harvest_token", boom)

@@ -158,6 +158,32 @@ class StickyProxyBackend:
         )
 
 
+def playwright_proxy(connect_string: str) -> dict:
+    """Convert a proxy connect string to a Playwright proxy option dict.
+
+    ``http://user:pass@host:port`` ->
+    ``{"server": "http://host:port", "username": "user", "password": "pass"}``.
+    Empty input -> ``{}`` (no proxy). Credentials stay inside the launch
+    call and are never logged or returned in metadata.
+    """
+    if not connect_string:
+        return {}
+    from urllib.parse import urlsplit
+
+    u = urlsplit(connect_string)
+    if not u.hostname:
+        return {}
+    server = f"{u.scheme}://{u.hostname}"
+    if u.port:
+        server += f":{u.port}"
+    out = {"server": server}
+    if u.username:
+        out["username"] = u.username
+    if u.password:
+        out["password"] = u.password
+    return out
+
+
 def build_proxy_backend(env: dict | None = None) -> ProxyBackend:
     """Build the proxy backend from env. Defaults to static (may be a no-op).
 
