@@ -253,6 +253,20 @@ Cloudflare interstitials have no sitekey. Their successful response includes:
 
 The cookie, user agent, and originating IP are a single clearance context.
 
+## Proxy and identity
+
+Cloudflare clearance, Turnstile and reCAPTCHA v3 harvests all honor the
+proxy layer: set `SOLVER_PROXY` (static), or `SOLVER_PROXY_ENDPOINT`
+(rotating, or sticky with `SOLVER_PROXY_STICKY=1`) and the browser egress IP
+is the proxy's, not the host's. When a proxy is configured but unavailable,
+the strategies fail closed (`deps_missing: proxy_unavailable`) rather than
+silently solving from the host IP. Result metadata carries only an 8-char
+fingerprint of the connect string — never the value.
+
+For Turnstile/v3 a residential proxy mainly buys IP reputation; for
+Cloudflare it is what makes `cf_clearance` reusable (cookie + user agent +
+IP are one identity).
+
 ## Observability by default
 
 Every runnable attempt records:
@@ -307,7 +321,7 @@ never values.
 | `SOLVER_BREAKER_MIN_SAMPLES` | `5` | Samples before opening |
 | `SOLVER_BREAKER_WINDOW_S` | `3600` | Sliding window |
 | `SOLVER_BROWSER_ENGINE` | `chromium` | Local clearance engine (`chromium`, `firefox`, `nodriver`, `camoufox`) |
-| `SOLVER_PROXY` | — | Proxy connect string for clearance harvest (binds `cf_clearance` to a controlled IP) |
+| `SOLVER_PROXY` | — | Proxy connect string for clearance and token harvests (Cloudflare, Turnstile, reCAPTCHA v3 bind to a controlled IP) |
 | `SOLVER_PROXY_ENDPOINT` | — | Rotating/sticky proxy provider endpoint (residential) |
 | `SOLVER_PROXY_STICKY` | — | `1` to cache proxy per session key within `SOLVER_PROXY_STICKY_TTL` |
 | `SOLVER_PROXY_STICKY_TTL` | `600` | Sticky proxy lifetime in seconds |

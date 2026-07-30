@@ -37,7 +37,7 @@ def test_missing_deps_reports(monkeypatch):
 
 def test_harvest_success(monkeypatch):
     monkeypatch.setattr(
-        TurnstileStrategy, "_harvest_token", lambda self, url, timeout: "tok-123"
+        TurnstileStrategy, "_harvest_token", lambda self, url, timeout, proxy="": "tok-123"
     )
     outcome = TurnstileStrategy().solve(req())
     assert outcome.solved is True
@@ -48,14 +48,14 @@ def test_harvest_success(monkeypatch):
 
 
 def test_harvest_empty_token(monkeypatch):
-    monkeypatch.setattr(TurnstileStrategy, "_harvest_token", lambda self, url, timeout: "")
+    monkeypatch.setattr(TurnstileStrategy, "_harvest_token", lambda self, url, timeout, proxy="": "")
     outcome = TurnstileStrategy().solve(req())
     assert outcome.solved is False
     assert outcome.reason == "turnstile_no_token_within_timeout"
 
 
 def test_harvest_exception_reports_reason(monkeypatch):
-    def boom(self, url, timeout):
+    def boom(self, url, timeout, proxy=""):
         raise RuntimeError("browser crashed")
 
     monkeypatch.setattr(TurnstileStrategy, "_harvest_token", boom)
@@ -66,7 +66,7 @@ def test_harvest_exception_reports_reason(monkeypatch):
 
 
 def test_reason_is_bounded(monkeypatch):
-    def boom(self, url, timeout):
+    def boom(self, url, timeout, proxy=""):
         raise RuntimeError("x" * 1000)
 
     monkeypatch.setattr(TurnstileStrategy, "_harvest_token", boom)
