@@ -144,7 +144,7 @@ class HCaptchaAudioStrategy:
                 )
                 page.wait_for_timeout(1500)
                 # Click the hCaptcha checkbox to trigger the challenge.
-                page.frame_locator(CHECKBOX_FRAME_SELECTOR).locator("#checkbox").click()
+                page.frame_locator(CHECKBOX_FRAME_SELECTOR).first.locator("#checkbox").click()
                 page.wait_for_timeout(2500)
                 challenge = _find_challenge_frame(page)
                 if challenge is None:
