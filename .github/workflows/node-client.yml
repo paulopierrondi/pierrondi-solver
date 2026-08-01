@@ -1,0 +1,32 @@
+name: Node client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "clients/node/**"
+      - ".github/workflows/node-client.yml"
+  pull_request:
+    paths:
+      - "clients/node/**"
+      - ".github/workflows/node-client.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node client (node --test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test
+        run: node --test clients/node/test/solver-client.test.mjs
