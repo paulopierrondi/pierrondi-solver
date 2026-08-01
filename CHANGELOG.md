@@ -44,7 +44,8 @@ and the project uses semantic versioning.
 ### Fixed
 
 - CI installs the `mcp` extra; `mcp` dependency pinned to `<2` because the
-  PyPI `mcp-2.0.0` release is a different package without `server.fastmcp`.
+  official MCP Python SDK 2.0.0 restructure (released 2026-07-28) moved the
+  `server.fastmcp` import path. Pin holds until the client migrates.
 
 ### Added
 
