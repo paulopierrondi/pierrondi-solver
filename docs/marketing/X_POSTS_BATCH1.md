@@ -51,7 +51,7 @@ MIT: github.com/paulopierrondi/pierrondi-solver
 
 ## 5. Security / build-in-public
 
-TIL while pinning deps: the official MCP SDK 2.0.0 restructure broke our import path on release day) is one unit, ambiguous states stop instead of retrying, telemetry never stores raw tokens — just an 8-char fingerprint.
+TIL while pinning deps: the official MCP SDK shipped 2.0.0 and our import path died the same hour. Pin `<2`, CI green, migrate on schedule — not on PyPI's.
 
 Boring beats clever.
 
