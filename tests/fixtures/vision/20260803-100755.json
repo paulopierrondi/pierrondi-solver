@@ -1,0 +1,33 @@
+{
+  "prompt": "Select all squares with\ncrosswalks\nIf there are none, click skip",
+  "target": "crosswalks",
+  "grid": 4,
+  "tiles": [
+    "20260803-100755/tile-00.png",
+    "20260803-100755/tile-01.png",
+    "20260803-100755/tile-02.png",
+    "20260803-100755/tile-03.png",
+    "20260803-100755/tile-04.png",
+    "20260803-100755/tile-05.png",
+    "20260803-100755/tile-06.png",
+    "20260803-100755/tile-07.png",
+    "20260803-100755/tile-08.png",
+    "20260803-100755/tile-09.png",
+    "20260803-100755/tile-10.png",
+    "20260803-100755/tile-11.png",
+    "20260803-100755/tile-12.png",
+    "20260803-100755/tile-13.png",
+    "20260803-100755/tile-14.png",
+    "20260803-100755/tile-15.png"
+  ],
+  "expected": [
+    4,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "note": "crosswalk zebra spans (1,0) cyclist stripe + rows 2-3 cols 0-3 + (3,0)-(3,1)"
+}

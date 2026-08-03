@@ -1,0 +1,23 @@
+{
+  "prompt": "Select all images with\ncars\nClick verify once there are none left",
+  "target": "cars",
+  "grid": 3,
+  "tiles": [
+    "20260803-101111/tile-00.png",
+    "20260803-101111/tile-01.png",
+    "20260803-101111/tile-02.png",
+    "20260803-101111/tile-03.png",
+    "20260803-101111/tile-04.png",
+    "20260803-101111/tile-05.png",
+    "20260803-101111/tile-06.png",
+    "20260803-101111/tile-07.png",
+    "20260803-101111/tile-08.png"
+  ],
+  "expected": [
+    1,
+    2,
+    3,
+    7
+  ],
+  "note": "cars: close-up pair idx1, SUV idx2, cars at crosswalk idx3, parking lot idx7"
+}

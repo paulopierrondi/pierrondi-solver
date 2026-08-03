@@ -1,0 +1,20 @@
+{
+  "prompt": "Select all images with\ncars\nClick verify once there are none left",
+  "target": "cars",
+  "grid": 3,
+  "tiles": [
+    "20260803-101104/tile-00.png",
+    "20260803-101104/tile-01.png",
+    "20260803-101104/tile-02.png",
+    "20260803-101104/tile-03.png",
+    "20260803-101104/tile-04.png",
+    "20260803-101104/tile-05.png",
+    "20260803-101104/tile-06.png",
+    "20260803-101104/tile-07.png",
+    "20260803-101104/tile-08.png"
+  ],
+  "expected": [
+    7
+  ],
+  "note": "only clear cars at idx 7 (highway); trucks at 1/6 not counted as cars (reCAPTCHA convention); tiny red car at 3 arguable"
+}

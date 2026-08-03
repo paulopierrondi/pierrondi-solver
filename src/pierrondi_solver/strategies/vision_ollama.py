@@ -33,11 +33,15 @@ class OllamaVisionClassifier:
     batched 9-image call, at the cost of N sequential requests.
     """
 
-    def __init__(self, model: str = DEFAULT_VISION_MODEL, base_url: str = DEFAULT_OLLAMA_URL, timeout_s: int = 120, per_tile: bool = True) -> None:
+    def __init__(self, model: str = DEFAULT_VISION_MODEL, base_url: str = DEFAULT_OLLAMA_URL, timeout_s: int = 120, per_tile: bool = True, votes: int = 3) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self.per_tile = per_tile
+        # Grid answers come from `votes` independent inferences; a cell must
+        # win the majority. Vision models are stochastic — consensus is the
+        # cheapest real accuracy lever.
+        self.votes = max(1, votes)
 
     def classify(self, prompt: str, tile_images: list[bytes]) -> list[int]:
         # Sliced single-photo grids (4x4) need full context: an object often
@@ -64,8 +68,8 @@ class OllamaVisionClassifier:
             "Reply ONLY with the cells as (row,col) pairs separated by spaces, "
             "e.g. '(1,2) (2,3)', or the word NONE."
         )
-        answer = self._chat(question, [photo])
-        return parse_grid_cells(answer, grid)
+        answers = [self._chat(question, [photo]) for _ in range(self.votes)]
+        return majority_cells(answers, grid, self.votes)
 
     def _chat(self, content: str, images: list[bytes]) -> str:
         payload = {
@@ -169,6 +173,16 @@ def parse_grid_cells(text: str, grid: int) -> list[int]:
             if idx not in out:
                 out.append(idx)
     return out
+
+
+def majority_cells(answers: list[str], grid: int, votes: int) -> list[int]:
+    """Cell must appear in more than half of the inference answers."""
+    threshold = votes // 2 + 1
+    counts: dict[int, int] = {}
+    for answer in answers:
+        for idx in parse_grid_cells(answer, grid):
+            counts[idx] = counts.get(idx, 0) + 1
+    return sorted(idx for idx, n in counts.items() if n >= threshold)
 
 
 def parse_yes(text: str) -> bool:

@@ -188,7 +188,16 @@ def test_classify_grid_mode_for_16_tiles(monkeypatch):
     clf = OllamaVisionClassifier(per_tile=True)
     out = clf.classify("buses", tiles)
     assert out == [6, 15]
-    assert len(calls) == 1  # one stitched grid call, not 16 per-tile calls
+    assert len(calls) == clf.votes  # consensus votes, not one call
+
+
+def test_majority_cells_requires_majority():
+    from pierrondi_solver.strategies.vision_ollama import majority_cells
+
+    answers = ["(1,2) (3,3)", "(1,2)", "(3,3)"]
+    assert majority_cells(answers, 4, 3) == [6, 15]
+    assert majority_cells(["(1,2)", "(3,3)", "(0,0)"], 4, 3) == []
+    assert majority_cells(["NONE", "NONE", "(1,1)"], 4, 3) == []
 
 
 # --- composite strategy ---

@@ -1,0 +1,22 @@
+{
+  "prompt": "Select all images with\na fire hydrant\nClick verify once there are none left.",
+  "target": "fire",
+  "grid": 3,
+  "tiles": [
+    "20260803-100748/tile-00.png",
+    "20260803-100748/tile-01.png",
+    "20260803-100748/tile-02.png",
+    "20260803-100748/tile-03.png",
+    "20260803-100748/tile-04.png",
+    "20260803-100748/tile-05.png",
+    "20260803-100748/tile-06.png",
+    "20260803-100748/tile-07.png",
+    "20260803-100748/tile-08.png"
+  ],
+  "expected": [
+    5,
+    7,
+    8
+  ],
+  "note": "fire hydrants at (1,2), (2,1), (2,2) \u2014 labeled from stitched review"
+}
