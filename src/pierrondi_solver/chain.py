@@ -10,10 +10,11 @@ from .providers.commercial import build_commercial_providers
 from .proxy import build_proxy_backend
 from .strategies.cloudflare_clearance import build_cloudflare_strategy
 from .strategies.hcaptcha import HCaptchaAudioStrategy
-from .strategies.recaptcha_v2_audio import RecaptchaV2AudioStrategy
-from .strategies.recaptcha_v2_image import RecaptchaV2ImageStrategy
+from .strategies.recaptcha_v2 import RecaptchaV2Strategy
+from .strategies.recaptcha_v2_image import register_classifier
 from .strategies.recaptcha_v3 import RecaptchaV3Strategy
 from .strategies.turnstile import TurnstileStrategy
+from .strategies.vision_ollama import build_default_ollama_classifier
 from .telemetry import Telemetry
 
 NO_API_KEY = "no_api_key"
@@ -40,10 +41,12 @@ class SolverChain:
                     "SOLVER_PROXY_STICKY_TTL": str(config.proxy_sticky_ttl),
                 }
             )
+            classifier = build_default_ollama_classifier()
+            if classifier is not None:
+                register_classifier(classifier)
             strategies = {
                 PROVIDER_PIERRONDI: [
-                    RecaptchaV2AudioStrategy(),
-                    RecaptchaV2ImageStrategy(),
+                    RecaptchaV2Strategy(),
                     RecaptchaV3Strategy(),
                     TurnstileStrategy(),
                     HCaptchaAudioStrategy(
