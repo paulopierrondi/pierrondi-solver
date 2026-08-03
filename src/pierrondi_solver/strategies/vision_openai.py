@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 import urllib.request
 
 from .vision_ollama import (
@@ -32,8 +33,50 @@ from .vision_ollama import (
 DEFAULT_MODEL = "gemini-2.5-flash"
 
 
+class VisionBudgetExceeded(RuntimeError):
+    """Raised when the hosted vision budget or per-solve call cap is hit."""
+
+
+_BUDGET_FILE = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "data", "vision_budget.json"
+)
+
+
+def _load_budget(path: str) -> dict:
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        if data.get("date") == time.strftime("%Y-%m-%d"):
+            return data
+    except Exception:
+        pass
+    return {"date": time.strftime("%Y-%m-%d"), "calls": 0, "cost_usd": 0.0}
+
+
+def _save_budget(path: str, data: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = f"{path}.tmp"
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except Exception:
+        pass  # budget persistence must never break a solve
+
+
 class OpenAIVisionClassifier:
-    """TileClassifier backed by an OpenAI-compatible chat completions API."""
+    """TileClassifier backed by an OpenAI-compatible chat completions API.
+
+    Cost control (hosted APIs are metered):
+    - ``SOLVER_VISION_COST_PER_CALL_USD`` (default 0.005, conservative for flash)
+      is charged per API call and accumulated in a daily counter at
+      ``data/vision_budget.json``.
+    - ``SOLVER_VISION_DAILY_BUDGET_USD`` (default 1.00) — when the day's
+      estimate crosses it, calls raise VisionBudgetExceeded and the strategy
+      reports an honest ``budget_exceeded`` reason.
+    - ``SOLVER_VISION_MAX_CALLS_PER_SOLVE`` (default 12) caps one solve's
+      blast radius (rounds x challenges x votes add up fast).
+    """
 
     def __init__(
         self,
@@ -42,18 +85,55 @@ class OpenAIVisionClassifier:
         api_key: str = "",
         timeout_s: int = 120,
         votes: int = 3,
+        cost_per_call_usd: float | None = None,
+        daily_budget_usd: float | None = None,
+        max_calls_per_solve: int | None = None,
+        budget_path: str = _BUDGET_FILE,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout_s = timeout_s
         self.votes = max(1, votes)
+        self.cost_per_call_usd = cost_per_call_usd if cost_per_call_usd is not None else float(
+            os.environ.get("SOLVER_VISION_COST_PER_CALL_USD", "0.005")
+        )
+        self.daily_budget_usd = daily_budget_usd if daily_budget_usd is not None else float(
+            os.environ.get("SOLVER_VISION_DAILY_BUDGET_USD", "1.00")
+        )
+        self.max_calls_per_solve = max_calls_per_solve if max_calls_per_solve is not None else int(
+            os.environ.get("SOLVER_VISION_MAX_CALLS_PER_SOLVE", "12")
+        )
+        self.budget_path = budget_path
+        self.calls_this_solve = 0
+        self.cost_this_solve_usd = 0.0
+
+    def begin_solve(self) -> None:
+        """Reset the per-solve counters. Strategies call this at solve start."""
+        self.calls_this_solve = 0
+        self.cost_this_solve_usd = 0.0
 
     def classify(self, prompt: str, tile_images: list[bytes]) -> list[int]:
         grid = 4 if len(tile_images) == 16 else 3
         return self._classify_grid(prompt, tile_images, grid)
 
     def _chat(self, content: str, images: list[bytes]) -> str:
+        self.calls_this_solve += 1
+        if self.calls_this_solve > self.max_calls_per_solve:
+            raise VisionBudgetExceeded(
+                f"max_calls_per_solve {self.max_calls_per_solve} exceeded"
+            )
+        budget = _load_budget(self.budget_path)
+        if budget["cost_usd"] + self.cost_per_call_usd > self.daily_budget_usd:
+            raise VisionBudgetExceeded(
+                f"daily budget ${self.daily_budget_usd:.2f} exceeded"
+            )
+        budget["calls"] += 1
+        budget["cost_usd"] = round(budget["cost_usd"] + self.cost_per_call_usd, 6)
+        _save_budget(self.budget_path, budget)
+        self.cost_this_solve_usd = round(
+            self.cost_this_solve_usd + self.cost_per_call_usd, 6
+        )
         parts = [{"type": "text", "text": content}]
         for img in images:
             b64 = base64.b64encode(img).decode("ascii")
