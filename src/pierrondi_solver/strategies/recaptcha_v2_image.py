@@ -32,6 +32,8 @@ _CLASSIFIER = None
 CHECKBOX_FRAME_SELECTOR = "iframe[title*='reCAPTCHA'], iframe[src*='anchor']"
 BFRAME_URL_MARK = "bframe"
 RESPONSE_SELECTOR = "#g-recaptcha-response, textarea[name='g-recaptcha-response']"
+MAX_ROUNDS = 4
+MAX_CHALLENGES = 3
 
 
 class TileClassifier(Protocol):
@@ -129,18 +131,31 @@ class RecaptchaV2ImageStrategy:
                 page.frame_locator(CHECKBOX_FRAME_SELECTOR).locator(
                     "#recaptcha-anchor").click()
                 page.wait_for_timeout(2500)
-                bframe = _find_bframe(page)
-                if bframe is None:
-                    return _read_response(page)  # trusted score; no challenge
-                prompt = _extract_prompt(bframe)
-                tiles = _extract_tile_images(bframe)
-                if not prompt or not tiles:
-                    raise RuntimeError("image challenge prompt or tiles not found")
-                matches = classifier.classify(prompt, tiles)
-                for idx in matches:
-                    _click_tile(bframe, idx)
-                bframe.locator("#recaptcha-verify-button").click()
-                page.wait_for_timeout(2500)
+                for _challenge in range(MAX_CHALLENGES):
+                    bframe = _find_bframe(page)
+                    if bframe is None:
+                        return _read_response(page)  # trusted score; no challenge
+                    prompt = _extract_prompt(bframe)
+                    tiles = _extract_tile_images(bframe)
+                    if not prompt or not tiles:
+                        raise RuntimeError("image challenge prompt or tiles not found")
+                    # "Select until none left" grids reload each clicked tile with a
+                    # new image, so one classification pass is not enough: loop until
+                    # the classifier finds nothing new (or the round budget ends).
+                    for _round in range(MAX_ROUNDS):
+                        matches = classifier.classify(prompt, tiles)
+                        if not matches:
+                            break
+                        for idx in matches:
+                            _click_tile(bframe, idx)
+                        page.wait_for_timeout(1800)  # let clicked tiles reload
+                        tiles = _extract_tile_images(bframe)
+                    bframe.locator("#recaptcha-verify-button").click()
+                    page.wait_for_timeout(2500)
+                    token = _read_response(page)
+                    if token:
+                        return token
+                    # "Please try again" presents a fresh challenge; loop.
                 return _read_response(page)
             finally:
                 browser.close()
