@@ -214,6 +214,21 @@ def ollama_model_available(base_url: str, model: str, timeout_s: int = 3) -> boo
         return False
 
 
+def build_default_classifier(env: dict | None = None):
+    """Provider-agnostic vision classifier factory.
+
+    ``SOLVER_VISION_PROVIDER=openai`` selects the hosted OpenAI-compatible
+    backend (vision_openai); anything else keeps the local Ollama default.
+    Returns None when the selected backend is unavailable.
+    """
+    env = env if env is not None else os.environ
+    if env.get("SOLVER_VISION_PROVIDER", "ollama").strip().lower() == "openai":
+        from .vision_openai import build_openai_classifier
+
+        return build_openai_classifier(env)
+    return build_default_ollama_classifier(env)
+
+
 def build_default_ollama_classifier(env: dict | None = None) -> OllamaVisionClassifier | None:
     """Return a ready classifier, or None when Ollama/model is unavailable.
 
