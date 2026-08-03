@@ -97,20 +97,30 @@ class RecaptchaV2ImageStrategy:
                 reason="deps_missing: pip install '.[local-solve]' + playwright install chromium",
             )
         try:
+            if hasattr(classifier, "begin_solve"):
+                classifier.begin_solve()
             token = self._solve_with_browser(request, classifier)
         except Exception as exc:
+            if type(exc).__name__ == "VisionBudgetExceeded":
+                return StrategyOutcome(
+                    strategy=self.name,
+                    provider=self.provider,
+                    latency_ms=_elapsed_ms(started),
+                    reason=f"budget_exceeded: {exc}"[:400],
+                )
             return StrategyOutcome(
                 strategy=self.name,
                 provider=self.provider,
                 latency_ms=_elapsed_ms(started),
                 reason=f"v2_image_failed: {type(exc).__name__}: {exc}"[:400],
             )
+        cost = getattr(classifier, "cost_this_solve_usd", 0.0)
         return StrategyOutcome(
             token=token or None,
             strategy=self.name,
             provider=self.provider,
             latency_ms=_elapsed_ms(started),
-            cost_usd=0.0,
+            cost_usd=cost,
             reason="" if token else "v2_image_empty_token",
         )
 

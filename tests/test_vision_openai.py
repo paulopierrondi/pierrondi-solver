@@ -87,3 +87,74 @@ def test_factory_falls_back_to_known_keys():
     assert clf is not None and clf.api_key == "g"
     clf = build_openai_classifier({"SOLVER_VISION_BASE_URL": "https://api.moonshot.ai/v1", "KIMI_API_KEY": "k"})
     assert clf is not None and clf.api_key == "k"
+
+
+def test_daily_budget_kill_switch(monkeypatch, tmp_path):
+    budget_file = tmp_path / "vision_budget.json"
+    budget_file.write_text(json.dumps({
+        "date": __import__("time").strftime("%Y-%m-%d"),
+        "calls": 200,
+        "cost_usd": 1.00,
+    }))
+    clf = OpenAIVisionClassifier(
+        base_url="https://x.test", api_key="k", budget_path=str(budget_file)
+    )
+    import pytest
+
+    from pierrondi_solver.strategies.vision_openai import VisionBudgetExceeded
+
+    with pytest.raises(VisionBudgetExceeded, match="daily budget"):
+        clf._chat("q", [_png()])
+
+
+def test_per_solve_call_cap(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda req, timeout=120: _FakeResp(
+            json.dumps({"choices": [{"message": {"content": "YES"}}]}).encode()
+        ),
+    )
+    clf = OpenAIVisionClassifier(
+        base_url="https://x.test",
+        api_key="k",
+        max_calls_per_solve=2,
+        budget_path=str(tmp_path / "b.json"),
+    )
+    import pytest
+
+    from pierrondi_solver.strategies.vision_openai import VisionBudgetExceeded
+
+    clf._chat("q", [_png()])
+    clf._chat("q", [_png()])
+    with pytest.raises(VisionBudgetExceeded, match="max_calls_per_solve"):
+        clf._chat("q", [_png()])
+    clf.begin_solve()
+    clf._chat("q", [_png()])  # reset works
+
+
+def test_cost_accumulates_in_daily_file(tmp_path):
+    budget_file = tmp_path / "b.json"
+
+    monkeypatch_called = []
+    import pierrondi_solver.strategies.vision_openai as vo
+
+    orig = vo.urllib.request.urlopen
+    vo.urllib.request.urlopen = lambda req, timeout=120: _FakeResp(
+        json.dumps({"choices": [{"message": {"content": "NONE"}}]}).encode()
+    )
+    try:
+        clf = OpenAIVisionClassifier(
+            base_url="https://x.test",
+            api_key="k",
+            cost_per_call_usd=0.01,
+            budget_path=str(budget_file),
+        )
+        clf._chat("q", [_png()])
+        clf._chat("q", [_png()])
+    finally:
+        vo.urllib.request.urlopen = orig
+    data = json.loads(budget_file.read_text())
+    assert data["calls"] == 2
+    assert abs(data["cost_usd"] - 0.02) < 1e-9
+    assert abs(clf.cost_this_solve_usd - 0.02) < 1e-9
+    monkeypatch_called  # silence
