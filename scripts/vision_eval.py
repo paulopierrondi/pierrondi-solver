@@ -13,7 +13,7 @@ import json
 import time
 from pathlib import Path
 
-from pierrondi_solver.strategies.vision_ollama import build_default_ollama_classifier
+from pierrondi_solver.strategies.vision_ollama import build_default_classifier
 
 FIXTURES = Path("tests/fixtures/vision")
 
@@ -23,7 +23,7 @@ def main() -> int:
     parser.add_argument("--votes", type=int, default=3)
     args = parser.parse_args()
 
-    clf = build_default_ollama_classifier()
+    clf = build_default_classifier()
     if clf is None:
         print("ollama vision model unavailable")
         return 1
