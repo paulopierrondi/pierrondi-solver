@@ -60,7 +60,7 @@ nodriver = [
     "nodriver>=0.39",
 ]
 mcp = [
-    "mcp>=1.2",
+    "mcp>=1.2,<2",
 ]
 camoufox = [
     "camoufox>=0.4",
