@@ -89,7 +89,10 @@ curl -s http://127.0.0.1:8791/solve \
     "type": "recaptcha_v2",
     "sitekey": "YOUR_AUTHORIZED_TEST_SITEKEY",
     "page_url": "https://your-authorized-test-page.example",
-    "lane": "default"
+    "lane": "default",
+    "purpose": "read_only",
+    "operation_id": "availability-check-42",
+    "attempt": 1
   }'
 ```
 
@@ -102,9 +105,29 @@ Success:
   "provider": "pierrondi",
   "latency_ms": 10600,
   "cost_usd": 0.0,
-  "extra": {}
+  "extra": {
+    "artifact_policy": {
+      "purpose": "read_only",
+      "operation_id": "availability-check-42",
+      "attempt": 1,
+      "consumption": "single_use",
+      "must_not_reuse_across_purposes": true
+    }
+  }
 }
 ```
+
+`purpose` makes the consumption boundary explicit:
+
+- `authentication` — login or session establishment;
+- `read_only` — a check that must not change remote state;
+- `state_change` — a separately authorized action;
+- `generic` — backward-compatible default.
+
+For token-based challenges, request a fresh solve when the purpose changes.
+Cloudflare clearance is instead marked `session_bound`: cookie, user agent,
+and originating IP must remain together. `operation_id` must be an opaque,
+non-secret identifier; telemetry stores only its hash.
 
 Unsolved paths remain inspectable:
 
@@ -274,6 +297,7 @@ Every runnable attempt records:
 - provider and strategy;
 - challenge type and site host;
 - lane;
+- semantic purpose and a hash of the optional operation ID;
 - success;
 - latency;
 - approximate USD cost;
@@ -320,7 +344,7 @@ never values.
 | `SOLVER_BREAKER_FAILURE_RATE` | `0.30` | Breaker threshold |
 | `SOLVER_BREAKER_MIN_SAMPLES` | `5` | Samples before opening |
 | `SOLVER_BREAKER_WINDOW_S` | `3600` | Sliding window |
-| `SOLVER_BROWSER_ENGINE` | `chromium` | Local clearance engine (`chromium`, `firefox`, `nodriver`, `camoufox`) |
+| `SOLVER_BROWSER_ENGINE` | `nodriver` | Silent local clearance engine (`nodriver`, `chromium`, `firefox`, `camoufox`) |
 | `SOLVER_PROXY` | — | Proxy connect string for clearance and token harvests (Cloudflare, Turnstile, reCAPTCHA v3 bind to a controlled IP) |
 | `SOLVER_PROXY_ENDPOINT` | — | Rotating/sticky proxy provider endpoint (residential) |
 | `SOLVER_PROXY_STICKY` | — | `1` to cache proxy per session key within `SOLVER_PROXY_STICKY_TTL` |

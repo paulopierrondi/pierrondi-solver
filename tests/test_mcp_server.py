@@ -43,10 +43,9 @@ def test_mcp_server_exposes_expected_tools():
 def test_solve_challenge_success(monkeypatch):
     captured = {}
 
-    def fake_solve_verbose(challenge, lane="default", timeout_s=120):
+    def fake_solve_verbose(challenge, **kwargs):
         captured["challenge"] = challenge
-        captured["lane"] = lane
-        captured["timeout_s"] = timeout_s
+        captured.update(kwargs)
         return {
             "solved": True,
             "token": "TOKEN_ABC",
@@ -66,13 +65,14 @@ def test_solve_challenge_success(monkeypatch):
     assert captured["challenge"].sitekey == "SITEKEY123"
     assert captured["challenge"].page_url == "https://example.com/page"
     assert captured["lane"] == "default"
+    assert captured["purpose"] == "generic"
 
 
 def test_solve_challenge_unsolved(monkeypatch):
     monkeypatch.setattr(
         mcp_server.client,
         "solve_verbose",
-        lambda c, lane="default", timeout_s=120: {
+        lambda c, **kwargs: {
             "solved": False,
             "error": "unsolved",
             "reason": "all providers failed",
@@ -89,7 +89,7 @@ def test_solve_challenge_unsolved(monkeypatch):
 def test_solve_challenge_cloudflare_passes_empty_sitekey(monkeypatch):
     captured = {}
 
-    def fake(challenge, lane="default", timeout_s=120):
+    def fake(challenge, **kwargs):
         captured["challenge"] = challenge
         return {"solved": True}
 
@@ -97,6 +97,27 @@ def test_solve_challenge_cloudflare_passes_empty_sitekey(monkeypatch):
     solve_challenge(challenge_type="cloudflare", page_url="https://x.example")
     assert captured["challenge"].sitekey == ""
     assert captured["challenge"].type == "cloudflare"
+
+
+def test_solve_challenge_passes_workflow_context(monkeypatch):
+    captured = {}
+
+    def fake(challenge, **kwargs):
+        captured.update(kwargs)
+        return {"solved": True}
+
+    monkeypatch.setattr(mcp_server.client, "solve_verbose", fake)
+    solve_challenge(
+        challenge_type="recaptcha_v2",
+        sitekey="SITEKEY123",
+        page_url="https://example.com/page",
+        purpose="read_only",
+        operation_id="check-7",
+        attempt=4,
+    )
+    assert captured["purpose"] == "read_only"
+    assert captured["operation_id"] == "check-7"
+    assert captured["attempt"] == 4
 
 
 # --- detect_challenge ---------------------------------------------------

@@ -77,15 +77,19 @@ class FakeTransport(httpx.BaseTransport):
     def __init__(self, status_code, body):
         self._status = status_code
         self._body = body
+        self.last_request = None
 
     def handle_request(self, request):
+        self.last_request = request
         return httpx.Response(self._status, json=self._body)
 
 
 def mock_client(monkeypatch, status_code, body):
-    transport = httpx.MockTransport(FakeTransport(status_code, body).handle_request)
+    fake = FakeTransport(status_code, body)
+    transport = httpx.MockTransport(fake.handle_request)
     monkeypatch.setattr(httpx, "post", lambda *a, **kw: httpx.Client(transport=transport).post(*a, **kw))
     monkeypatch.setattr(httpx, "get", lambda *a, **kw: httpx.Client(transport=transport).get(*a, **kw))
+    return fake
 
 
 def test_solve_success(monkeypatch):
@@ -93,6 +97,25 @@ def test_solve_success(monkeypatch):
                                    "provider": "pierrondi", "latency_ms": 10, "cost_usd": 0.0})
     result = solve(Challenge("recaptcha_v2", "6Lc", "https://example.com"))
     assert result["token"] == "TOK"
+
+
+def test_solve_sends_workflow_context(monkeypatch):
+    fake = mock_client(
+        monkeypatch,
+        200,
+        {"token": "TOK", "strategy": "v2_audio", "provider": "pierrondi",
+         "latency_ms": 10, "cost_usd": 0.0},
+    )
+    solve(
+        Challenge("recaptcha_v2", "6Lc", "https://example.com"),
+        purpose="read_only",
+        operation_id="availability-42",
+        attempt=3,
+    )
+    payload = json.loads(fake.last_request.content)
+    assert payload["purpose"] == "read_only"
+    assert payload["operation_id"] == "availability-42"
+    assert payload["attempt"] == 3
 
 
 def test_solve_unsolved_returns_none(monkeypatch):
@@ -131,3 +154,27 @@ def test_cli_health_down(capsys, monkeypatch):
     rc = main(["health"])
     assert rc == 1
     assert json.loads(capsys.readouterr().out)["status"] == "down"
+
+
+def test_cli_solve_accepts_workflow_context(capsys, monkeypatch):
+    captured = {}
+
+    def fake_solve_verbose(challenge, **kwargs):
+        captured.update(kwargs)
+        return {"solved": True, "token": "TOK"}
+
+    monkeypatch.setattr("pierrondi_solver.client.solve_verbose", fake_solve_verbose)
+    rc = main([
+        "solve",
+        "--type", "recaptcha_v2",
+        "--sitekey", "6Lc",
+        "--url", "https://example.com",
+        "--purpose", "state_change",
+        "--operation-id", "booking-42",
+        "--attempt", "2",
+    ])
+    assert rc == 0
+    assert json.loads(capsys.readouterr().out)["solved"] is True
+    assert captured["purpose"] == "state_change"
+    assert captured["operation_id"] == "booking-42"
+    assert captured["attempt"] == 2

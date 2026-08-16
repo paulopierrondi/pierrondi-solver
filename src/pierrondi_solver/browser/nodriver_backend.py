@@ -19,7 +19,11 @@ from __future__ import annotations
 
 import asyncio
 
-from .base import BrowserOpts, HarvestedContext
+from .base import (
+    BrowserOpts,
+    HarvestedContext,
+    cloudflare_interstitial_text_present,
+)
 
 CLEARANCE_COOKIE = "cf_clearance"
 
@@ -78,13 +82,16 @@ class NodriverBackend:
         try:
             page = await browser.get(page_url)
             user_agent = await self._user_agent(page)
-            clearance = await self._wait_for_clearance(browser, timeout_s)
+            clearance, page_html = await self._wait_for_clearance(
+                browser, page, timeout_s
+            )
             cookies = await self._all_cookies(browser)
             return HarvestedContext(
                 clearance=clearance,
                 user_agent=user_agent,
                 cookies=cookies,
                 engine=self.name,
+                page_html=page_html,
             )
         finally:
             try:
@@ -115,21 +122,81 @@ class NodriverBackend:
         except Exception:
             return {}
 
-    async def _wait_for_clearance(self, browser, timeout_s: int) -> str:
+    async def _rendered_text(self, page) -> tuple[str, str] | None:
+        try:
+            title = await page.evaluate("document.title || ''", return_by_value=True)
+            body = await page.evaluate(
+                "document.body ? document.body.innerText : ''",
+                return_by_value=True,
+            )
+        except TypeError:
+            try:
+                title = await page.evaluate("document.title || ''")
+                body = await page.evaluate(
+                    "document.body ? document.body.innerText : ''"
+                )
+            except Exception:
+                return None
+        except Exception:
+            return None
+        if not isinstance(title, str) or not isinstance(body, str):
+            return None
+        return title, body
+
+    async def _wait_for_clearance(
+        self, browser, page, timeout_s: int
+    ) -> tuple[str, str]:
         import time
 
-        from nodriver import cdp
+        try:
+            from nodriver import cdp
+
+            cookies_request = cdp.network.get_cookies()
+        except ModuleNotFoundError:
+            # deps_missing() keeps production from reaching here without the
+            # extra; fake backends in tests ignore the payload entirely.
+            cookies_request = None
 
         deadline = time.monotonic() + timeout_s
+        reloaded_after_clearance = False
         while time.monotonic() < deadline:
             try:
-                cookie_list = await browser.main_tab.send(
-                    cdp.network.get_cookies()
-                )
+                cookie_list = await browser.main_tab.send(cookies_request)
             except Exception:
                 cookie_list = []
             for c in cookie_list or []:
                 if c.name == CLEARANCE_COOKIE and c.value:
-                    return c.value
-            await asyncio.sleep(2)
-        return ""
+                    if not reloaded_after_clearance:
+                        reloaded_after_clearance = True
+                        try:
+                            await page.reload()
+                        except Exception:
+                            pass
+                        await asyncio.sleep(1)
+                        break
+
+                    rendered = await self._rendered_text(page)
+                    if rendered is None or cloudflare_interstitial_text_present(
+                        rendered[0], rendered[1]
+                    ):
+                        await asyncio.sleep(2)
+                        break
+
+                    try:
+                        page_html = str(await page.get_content() or "")[:500_000]
+                    except Exception:
+                        page_html = ""
+
+                    # Re-probe after serializing the page. A redirect back to
+                    # the challenge between probes must fail closed.
+                    rendered = await self._rendered_text(page)
+                    if rendered is None or cloudflare_interstitial_text_present(
+                        rendered[0], rendered[1]
+                    ):
+                        await asyncio.sleep(2)
+                        break
+                    return c.value, page_html
+            else:
+                await asyncio.sleep(2)
+                continue
+        return "", ""

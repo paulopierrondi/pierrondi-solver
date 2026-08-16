@@ -43,7 +43,8 @@ flowchart LR
 4. An open circuit is skipped. Missing keys, missing dependencies, and explicit
    stubs are also skipped without burning breaker budget.
 5. Every runnable attempt updates the breaker and telemetry.
-6. The first successful outcome returns a token or Cloudflare clearance context.
+6. The first successful outcome returns a token or Cloudflare clearance context
+   plus an `artifact_policy` describing its intended purpose and consumption.
 7. If all paths fail, the API returns HTTP `422` with structured attempt reasons.
 
 The default order is:
@@ -72,8 +73,8 @@ flowchart LR
     N --> NN["Chrome via CDP (undetected, no webdriver)"]
 ```
 
-`SOLVER_BROWSER_ENGINE` selects the backend (`chromium` default; `firefox` and
-`nodriver` opt-in). Each backend reports its optional dependencies via
+`SOLVER_BROWSER_ENGINE` selects the backend (`nodriver` default for silent,
+webdriver-free runs; `chromium`, `firefox`, and `camoufox` are selectable). Each backend reports its optional dependencies via
 `deps_missing()`; when the engine is unavailable the chain skips it without
 burning breaker budget — the same convention used for provider API keys and
 strategy stubs. The `engine` that produced a clearance is returned in
@@ -108,6 +109,12 @@ harvesting on the host IP.
   repository files.
 - Telemetry stores the site host, lane, latency, approximate cost, success, and
   a 12-character SHA-256 token fingerprint—not the token itself.
+- Callers may add an opaque `operation_id` and semantic `purpose`
+  (`authentication`, `read_only`, or `state_change`). Telemetry stores only the
+  operation ID fingerprint and aggregates results by purpose.
+- Token artifacts are marked `single_use` and must not cross purposes. A
+  Cloudflare clearance is marked `session_bound` because its cookie, user agent,
+  and IP form one identity context.
 - Cloudflare clearance is bound to the originating user agent and IP. Callers
   must reuse both.
 - Login walls and 2FA are outside the supported policy.

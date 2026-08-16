@@ -78,6 +78,8 @@ class SolverChain:
                 continue  # provider cannot run here: skip without burning breaker budget
             self._record(provider, request, outcome)
             if outcome.solved:
+                extra = dict(outcome.extra)
+                extra["artifact_policy"] = request.artifact_policy()
                 return (
                     SolveResult(
                         token=outcome.token,
@@ -85,7 +87,7 @@ class SolverChain:
                         provider=provider,
                         latency_ms=outcome.latency_ms,
                         cost_usd=outcome.cost_usd,
-                        extra=outcome.extra,
+                        extra=extra,
                     ),
                     None,
                 )
@@ -121,6 +123,8 @@ class SolverChain:
             success=outcome.solved,
             token=outcome.token or "",
             reason=outcome.reason,
+            purpose=request.purpose.value,
+            operation_id=request.operation_id,
         )
 
 

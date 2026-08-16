@@ -12,14 +12,46 @@ codebase already uses for ``_playwright_missing``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
+
+
+_CLOUDFLARE_INTERSTITIAL_MARKERS = (
+    "just a moment",
+    "checking your browser",
+    "verify you are human",
+    "performing security verification",
+    "enable javascript and cookies to continue",
+    "cf_chl",
+)
+
+
+def cloudflare_interstitial_text_present(title: str, body: str) -> bool:
+    """Return whether rendered text still represents a CF interstitial."""
+
+    rendered = f"{title}\n{body[:20_000]}".lower()
+    return any(marker in rendered for marker in _CLOUDFLARE_INTERSTITIAL_MARKERS)
+
+
+def cloudflare_interstitial_present(page: Any) -> bool:
+    """Fail closed until the harvesting browser has left the CF interstitial.
+
+    A ``cf_clearance`` cookie can appear before Cloudflare finishes its redirect.
+    Returning it at that instant produces a false ``solved`` result: the caller
+    replays the cookie while the browser is still bound to the challenge page.
+    """
+
+    try:
+        title = str(page.title() or "")
+        body = str(page.locator("body").inner_text(timeout=2_000) or "")
+    except Exception:
+        return True
+    return cloudflare_interstitial_text_present(title, body)
 
 
 @dataclass
 class BrowserOpts:
     """Launch/context options. Defaults reproduce the original hardcoded
-    Chromium fingerprint exactly, so behavior is unchanged when no override
-    is supplied."""
+    Chromium fingerprint while keeping unattended runs silent by default."""
 
     user_agent: str = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -28,7 +60,7 @@ class BrowserOpts:
     )
     viewport: dict = field(default_factory=lambda: {"width": 1440, "height": 900})
     locale: str = "en-US"
-    headless: bool = False
+    headless: bool = True
     # Optional proxy connect string (e.g. "http://user:pass@host:port").
     # When set, the backend routes the clearance harvest through this proxy so
     # the resulting cf_clearance is bound to a controlled IP, not the host IP.
@@ -43,6 +75,10 @@ class HarvestedContext:
     user_agent: str
     cookies: dict
     engine: str
+    # Cleared page as rendered inside the harvesting browser; lets callers
+    # with a different TLS fingerprint consume content without replaying the
+    # fingerprint-bound cf_clearance cookie. Optional: engines may omit it.
+    page_html: str = ""
 
 
 class BrowserBackend(Protocol):

@@ -6,16 +6,23 @@ strategy delegation) and the backward-compatible default (Chromium).
 """
 from __future__ import annotations
 
+import asyncio
+
 from pierrondi_solver.browser import (
     BACKENDS,
     browser_deps_missing,
     get_browser,
 )
-from pierrondi_solver.browser.base import HarvestedContext
+from pierrondi_solver.browser.base import (
+    HarvestedContext,
+    cloudflare_interstitial_present,
+    cloudflare_interstitial_text_present,
+)
 from pierrondi_solver.browser.chromium import ChromiumBackend
 from pierrondi_solver.browser.firefox import FirefoxBackend
 from pierrondi_solver.browser.nodriver_backend import NodriverBackend
 from pierrondi_solver.browser.camoufox_backend import CamoufoxBackend
+from pierrondi_solver.config import load_config
 from pierrondi_solver.models import ChallengeType, SolveRequest
 from pierrondi_solver.strategies.cloudflare_clearance import (
     CloudflareClearanceStrategy,
@@ -30,6 +37,47 @@ def _req():
         page_url="https://example.com/protected",
         timeout_s=5,
     )
+
+
+class _RenderedPage:
+    def __init__(self, title: str, body: str, fail: bool = False) -> None:
+        self._title = title
+        self._body = body
+        self._fail = fail
+
+    def title(self):
+        if self._fail:
+            raise RuntimeError("page unavailable")
+        return self._title
+
+    def locator(self, _selector):
+        return self
+
+    def inner_text(self, timeout):
+        assert timeout == 2_000
+        return self._body
+
+
+def test_cloudflare_interstitial_must_disappear_before_clearance_is_reusable():
+    assert cloudflare_interstitial_present(
+        _RenderedPage("Just a moment...", "Checking your browser before accessing Workana")
+    ) is True
+    assert cloudflare_interstitial_present(
+        _RenderedPage("Project", "Send a proposal to this project")
+    ) is False
+
+
+def test_cloudflare_render_probe_fails_closed():
+    assert cloudflare_interstitial_present(_RenderedPage("", "", fail=True)) is True
+
+
+def test_cloudflare_text_probe_supports_non_playwright_backends():
+    assert cloudflare_interstitial_text_present(
+        "Just a moment...", "Performing security verification"
+    ) is True
+    assert cloudflare_interstitial_text_present(
+        "Available project", "Send a proposal to this project"
+    ) is False
 
 
 # --- registry / factory -------------------------------------------------
@@ -125,6 +173,59 @@ def test_nodriver_present_deps_empty(monkeypatch):
     assert NodriverBackend().deps_missing() == []
 
 
+def test_nodriver_reloads_and_waits_for_interstitial_to_disappear(monkeypatch):
+    class _Cookie:
+        name = "cf_clearance"
+        value = "CLEARANCE"
+
+    class _Tab:
+        async def send(self, _command):
+            return [_Cookie()]
+
+    class _Browser:
+        main_tab = _Tab()
+
+    class _Page:
+        def __init__(self):
+            self.reloads = 0
+            self.probes = 0
+
+        async def reload(self):
+            self.reloads += 1
+
+        async def evaluate(self, script, return_by_value=True):
+            if "document.title" in script:
+                return "Just a moment..." if self.probes < 2 else "Available project"
+            self.probes += 1
+            return (
+                "Checking your browser"
+                if self.probes < 2
+                else "Send a proposal to this project"
+            )
+
+        async def get_content(self):
+            return "<html><body>Send a proposal to this project</body></html>"
+
+    async def _no_sleep(_seconds):
+        return None
+
+    monkeypatch.setattr(
+        "pierrondi_solver.browser.nodriver_backend.asyncio.sleep", _no_sleep
+    )
+    page = _Page()
+    clearance, page_html = asyncio.run(
+        NodriverBackend()._wait_for_clearance(_Browser(), page, 1)
+    )
+
+    assert clearance == "CLEARANCE"
+    assert page.reloads == 1
+    assert "Send a proposal" in page_html
+
+
+def test_runtime_default_browser_is_silent_nodriver():
+    assert load_config({}).browser_engine == "nodriver"
+
+
 # --- camoufox backend ---------------------------------------------------
 
 def test_camoufox_backend_name():
@@ -193,6 +294,7 @@ def test_strategy_accepts_injected_backend_and_solves():
     assert outcome.extra["user_agent"] == "FAKE_UA"
     assert outcome.extra["cookies"]["cf_clearance"] == "TOKEN_123"
     assert backend.harvest_called is True
+    assert backend.opts.headless is True
 
 
 def test_strategy_resolves_proxy_per_lane_without_exposing_credentials():
