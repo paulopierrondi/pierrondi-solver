@@ -68,5 +68,10 @@ if echo "$REASON" | grep -qiE "accessibility|empty_token|hcaptcha_audio_failed";
   exit 1
 fi
 
+if echo "$REASON" | grep -qiE "deps_missing|no_api_key|budget_exceeded"; then
+  notify "falha de INFRAESTRUTURA do solver (nao e cookie): ${REASON:0:120}. Remediacao: (1) cd /Users/paulopierrondi/Projects/pierrondi-solver && .venv/bin/pip install -e '.[local-solve,nodriver,mcp]'; (2) conferir chaves comerciais com brain-load-secrets list (CAPSOLVER_API_KEY/TWOCAPTCHA_API_KEY/CAPMONSTER_API_KEY/CAPSOLVER_PROXY) e importar com brain-secret-intake se ausentes; (3) launchctl kickstart -k gui/$(id -u)/$LABEL."
+  exit 1
+fi
+
 say "UNRELATED failure (no notify): ${REASON:0:200}"
 exit 0
