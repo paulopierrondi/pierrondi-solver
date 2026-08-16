@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS solves (
     cost_usd REAL NOT NULL,
     success INTEGER NOT NULL,
     token_hash TEXT NOT NULL DEFAULT '',
-    reason TEXT NOT NULL DEFAULT ''
+    reason TEXT NOT NULL DEFAULT '',
+    purpose TEXT NOT NULL DEFAULT 'generic',
+    operation_hash TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_solves_ts ON solves(ts);
 CREATE INDEX IF NOT EXISTS idx_solves_provider ON solves(provider, ts);
@@ -38,6 +40,12 @@ def token_fingerprint(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()[:12] if token else ""
 
 
+def operation_fingerprint(operation_id: str) -> str:
+    if not operation_id:
+        return ""
+    return hashlib.sha256(operation_id.encode()).hexdigest()[:12]
+
+
 class Telemetry:
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
@@ -46,9 +54,25 @@ class Telemetry:
             os.makedirs(parent, exist_ok=True)
         with self._conn() as conn:
             conn.executescript(_SCHEMA)
+            self._migrate(conn)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_solves_purpose ON solves(purpose, ts)"
+            )
 
     def _conn(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
+
+    @staticmethod
+    def _migrate(conn: sqlite3.Connection) -> None:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(solves)")}
+        if "purpose" not in columns:
+            conn.execute(
+                "ALTER TABLE solves ADD COLUMN purpose TEXT NOT NULL DEFAULT 'generic'"
+            )
+        if "operation_hash" not in columns:
+            conn.execute(
+                "ALTER TABLE solves ADD COLUMN operation_hash TEXT NOT NULL DEFAULT ''"
+            )
 
     def log_attempt(
         self,
@@ -62,11 +86,14 @@ class Telemetry:
         success: bool,
         token: str = "",
         reason: str = "",
+        purpose: str = "generic",
+        operation_id: str = "",
     ) -> None:
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO solves (ts, provider, challenge_type, strategy, site_host, lane,"
-                " latency_ms, cost_usd, success, token_hash, reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                " latency_ms, cost_usd, success, token_hash, reason, purpose, operation_hash)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     time.time(),
                     provider,
@@ -79,6 +106,8 @@ class Telemetry:
                     1 if success else 0,
                     token_fingerprint(token),
                     reason[:500],
+                    purpose,
+                    operation_fingerprint(operation_id),
                 ),
             )
 
@@ -93,6 +122,11 @@ class Telemetry:
             total = conn.execute(
                 "SELECT COUNT(*), SUM(success) FROM solves WHERE ts >= ?", (cutoff,)
             ).fetchone()
+            purpose_rows = conn.execute(
+                "SELECT purpose, COUNT(*), SUM(success) FROM solves"
+                " WHERE ts >= ? GROUP BY purpose",
+                (cutoff,),
+            ).fetchall()
         providers = {
             r[0]: {
                 "attempts": r[1],
@@ -108,4 +142,14 @@ class Telemetry:
             "attempts": total[0] or 0,
             "solved": total[1] or 0,
             "by_provider": providers,
+            "by_purpose": {
+                row[0]: {
+                    "attempts": row[1],
+                    "solved": row[2] or 0,
+                    "success_rate": (
+                        round((row[2] or 0) / row[1], 4) if row[1] else 0.0
+                    ),
+                }
+                for row in purpose_rows
+            },
         }

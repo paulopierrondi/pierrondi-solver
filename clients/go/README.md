@@ -99,6 +99,16 @@ health, err := client.Health(ctx)
 // health.Status, health.Providers
 ```
 
+## Live smoke
+
+Zero-cost probes against the running local service (health plus the
+stage-aware 422 rejections; no valid solve payload is ever sent). Requires
+both the build tag and the env guard:
+
+```bash
+SOLVER_LIVE_SMOKE=1 go test -tags live -run LiveSmoke -v ./...
+```
+
 ## Scope
 
 Out of scope by design: worker pools, queues, browser control, retry

@@ -42,6 +42,9 @@ def solve_challenge(
     sitekey: str = "",
     lane: str = "default",
     timeout_s: int = 120,
+    purpose: str = "generic",
+    operation_id: str = "",
+    attempt: int = 1,
 ) -> dict:
     """Solve a CAPTCHA / Cloudflare challenge via the pierrondi-solver service.
 
@@ -54,6 +57,11 @@ def solve_challenge(
             ignored for cloudflare.
         lane: Routing lane (default "default").
         timeout_s: Max seconds to wait for a solve (5-600).
+        purpose: Semantic use: generic, authentication, read_only, or
+            state_change. Token challenges require a new solve when purpose
+            changes.
+        operation_id: Opaque non-secret correlation ID; never stored raw.
+        attempt: Positive attempt number inside the operation.
 
     Returns:
         {"solved": bool, ...result_or_reason}. On success for cloudflare the
@@ -63,7 +71,14 @@ def solve_challenge(
     challenge = client.Challenge(
         type=challenge_type, sitekey=sitekey, page_url=page_url
     )
-    return client.solve_verbose(challenge, lane=lane, timeout_s=timeout_s)
+    return client.solve_verbose(
+        challenge,
+        lane=lane,
+        timeout_s=timeout_s,
+        purpose=purpose,
+        operation_id=operation_id,
+        attempt=attempt,
+    )
 
 
 @mcp.tool()

@@ -46,7 +46,7 @@ CF_INTERSTITIAL_MARKERS = [
     "challenge-platform",
 ]
 
-SITEKEY_RE = re.compile(r'data-sitekey=["\']([A-Za-z0-9_-]{20,})["\']')
+SITEKEY_RE = re.compile(r'data-sitekey=\\?["\']([A-Za-z0-9_-]{20,})')
 
 INSTRUCTION = (
     "CAPTCHA/Cloudflare detectado na resposta da tool. Resolva EM SILÊNCIO via pierrondi-solver "
@@ -61,20 +61,23 @@ INSTRUCTION = (
 
 
 def _response_text(payload: dict) -> str:
-    resp = payload.get("tool_response", "")
-    if isinstance(resp, str):
-        return resp
-    try:
-        return json.dumps(resp)
-    except Exception:
-        return str(resp)
+    for key in ("tool_response", "tool_result", "result", "output"):
+        resp = payload.get(key)
+        if resp:
+            if isinstance(resp, str):
+                return resp
+            try:
+                return json.dumps(resp)
+            except Exception:  # noqa: BLE001 - hook must never break the agent flow
+                return str(resp)
+    return ""
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except Exception:
-        return 0  # never block on malformed input
+    except Exception:  # noqa: BLE001 - never block on malformed input
+        return 0
 
     text = _response_text(payload).lower()
     if not any(marker in text for marker in CHALLENGE_MARKERS):
@@ -88,6 +91,12 @@ def main() -> int:
     context = INSTRUCTION
     if sitekey:
         context += f" sitekey={sitekey}"
+
+    if payload.get("client_type") == "kimi_code_cli":
+        # Kimi Code: PostToolUse is observation-only; plain stdout on exit 0 is
+        # what may be appended to the agent context.
+        print(context)
+        return 0
 
     print(json.dumps({
         "hookSpecificOutput": {

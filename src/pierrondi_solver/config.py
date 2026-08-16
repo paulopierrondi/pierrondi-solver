@@ -28,9 +28,9 @@ class Config:
     breaker_min_samples: int = 5
     breaker_window_s: int = 3600
     # Browser engine used by local clearance strategies (e.g. Cloudflare).
-    # Default "chromium" reproduces the original behavior. Other engines
-    # ("firefox", and later camoufox/nodriver/patchright) are opt-in.
-    browser_engine: str = "chromium"
+    # Nodriver is the unattended default: it stays headless while avoiding
+    # webdriver fingerprints that managed challenges commonly reject.
+    browser_engine: str = "nodriver"
     # Proxy connect string for the clearance harvest. When set, the browser
     # backend routes through it so cf_clearance binds to a controlled IP.
     proxy: str = ""
@@ -61,7 +61,7 @@ def load_config(env: dict | None = None) -> Config:
         breaker_failure_rate=float(env.get("SOLVER_BREAKER_FAILURE_RATE", "0.30")),
         breaker_min_samples=int(env.get("SOLVER_BREAKER_MIN_SAMPLES", "5")),
         breaker_window_s=int(env.get("SOLVER_BREAKER_WINDOW_S", "3600")),
-        browser_engine=env.get("SOLVER_BROWSER_ENGINE", "chromium").strip().lower(),
+        browser_engine=env.get("SOLVER_BROWSER_ENGINE", "nodriver").strip().lower(),
         proxy=env.get("SOLVER_PROXY", "").strip(),
         proxy_endpoint=env.get("SOLVER_PROXY_ENDPOINT", "").strip(),
         proxy_sticky=env.get("SOLVER_PROXY_STICKY", "").strip().lower()

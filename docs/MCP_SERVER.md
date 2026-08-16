@@ -24,7 +24,7 @@ uvicorn pierrondi_solver.main:app --port 8791 --app-dir src
 
 | Tool | Purpose |
 | --- | --- |
-| `solve_challenge` | Solve a CAPTCHA / Cloudflare challenge (`type`, `page_url`, `sitekey`, `lane`, `timeout_s`). Returns `{solved, token/​reason, ...}`. Cloudflare results include `extra.cookies.cf_clearance` + `extra.user_agent` (reuse both together). |
+| `solve_challenge` | Solve a CAPTCHA / Cloudflare challenge (`type`, `page_url`, `sitekey`, `lane`, `timeout_s`). Returns `{solved, token/​reason, ...}`. Cloudflare results include `extra.cookies.cf_clearance` + `extra.user_agent` (reuse both together). Optional stage-aware fields: `purpose` (`generic`/`authentication`/`read_only`/`state_change`), `operation_id` (opaque, non-secret correlation id) and `attempt`; the response carries `extra.artifact_policy` with the matching `consumption` rule. |
 | `detect_challenge` | Extract `(type, sitekey)` from page HTML (`html`, `page_url`). Returns `{challenge: {...} \| null}`. |
 | `get_browser_session` | List browser engines or check one (`engine`). Returns `{engine, available, deps_missing}` or `{engines: [...]}`. Use to pick a stealthier engine (`nodriver`/`firefox`) when `chromium` fails. |
 | `service_health` | `GET /health` — service status + configured provider order. |

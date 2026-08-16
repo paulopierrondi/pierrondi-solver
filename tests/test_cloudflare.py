@@ -26,5 +26,9 @@ def test_missing_playwright_reports_deps_missing(monkeypatch):
     assert outcome.cost_usd == 0.0
 
 
-def test_headful_default_for_managed_challenges():
-    assert CloudflareClearanceStrategy().headless is False
+def test_headless_default_keeps_unattended_runs_silent():
+    assert CloudflareClearanceStrategy().headless is True
+
+
+def test_headful_mode_remains_an_explicit_diagnostic_opt_in():
+    assert CloudflareClearanceStrategy(headless=False).headless is False

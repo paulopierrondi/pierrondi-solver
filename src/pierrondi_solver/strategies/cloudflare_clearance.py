@@ -37,12 +37,13 @@ class CloudflareClearanceStrategy:
 
     def __init__(
         self,
-        headless: bool = False,
+        headless: bool = True,
         backend: BrowserBackend | None = None,
         proxy_backend: ProxyBackend | None = None,
         proxy_required: bool = False,
     ) -> None:
-        # headful is materially more reliable against managed challenges
+        # unattended runs stay silent by default; headful remains an explicit
+        # diagnostic opt-in (headless=False)
         self.headless = headless
         # default backend keeps current behavior (Chromium) when not injected
         self.backend: BrowserBackend = backend or ChromiumBackend()

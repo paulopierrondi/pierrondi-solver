@@ -1,8 +1,8 @@
+import importlib.util
 import io
 import json
 from contextlib import redirect_stdout
 from pathlib import Path
-import importlib.util
 
 HOOK_PATH = Path(__file__).parent.parent / "hooks" / "captcha_posttool_hook.py"
 spec = importlib.util.spec_from_file_location("captcha_posttool_hook", HOOK_PATH)
@@ -67,3 +67,20 @@ def test_handles_dict_response(monkeypatch):
     rc, out = run_hook(monkeypatch, payload)
     assert rc == 0
     assert "pierrondi-solver" in json.loads(out)["hookSpecificOutput"]["additionalContext"]
+
+
+def test_kimi_surface_prints_plain_text(monkeypatch):
+    payload = {"client_type": "kimi_code_cli", "tool_name": "FetchURL",
+               "tool_response": "Just a moment... cf_chl_ challenge-platform"}
+    rc, out = run_hook(monkeypatch, payload)
+    assert rc == 0
+    assert "pierrondi-solver" in out
+    assert not out.strip().startswith("{")  # plain text, not Claude JSON
+
+
+def test_kimi_tool_result_fallback(monkeypatch):
+    payload = {"client_type": "kimi_code_cli",
+               "tool_result": {"html": '<div class="cf-turnstile" data-sitekey="0x4AAAAAA1234567890abcdef"></div>'}}
+    rc, out = run_hook(monkeypatch, payload)
+    assert rc == 0
+    assert "sitekey=0x4AAAAAA1234567890abcdef" in out

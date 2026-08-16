@@ -95,19 +95,42 @@ def health(timeout: float = 5.0) -> dict:
     return resp.json()
 
 
-def solve(challenge: Challenge, lane: str = "default", timeout_s: int = 120) -> dict | None:
+def _solve_payload(
+    challenge: Challenge,
+    lane: str,
+    timeout_s: int,
+    purpose: str,
+    operation_id: str,
+    attempt: int,
+) -> dict:
+    return {
+        "type": challenge.type,
+        "sitekey": challenge.sitekey or "unknown",
+        "page_url": challenge.page_url,
+        "lane": lane,
+        "timeout_s": timeout_s,
+        "purpose": purpose,
+        "operation_id": operation_id,
+        "attempt": attempt,
+    }
+
+
+def solve(
+    challenge: Challenge,
+    lane: str = "default",
+    timeout_s: int = 120,
+    purpose: str = "generic",
+    operation_id: str = "",
+    attempt: int = 1,
+) -> dict | None:
     """POST /solve. Returns the result dict on success, None on unsolved
     (reason available via solve_verbose). Raises on transport errors so the
     caller can decide its own fallback."""
     resp = httpx.post(
         f"{solver_url()}/solve",
-        json={
-            "type": challenge.type,
-            "sitekey": challenge.sitekey or "unknown",
-            "page_url": challenge.page_url,
-            "lane": lane,
-            "timeout_s": timeout_s,
-        },
+        json=_solve_payload(
+            challenge, lane, timeout_s, purpose, operation_id, attempt
+        ),
         timeout=timeout_s + 30,
     )
     if resp.status_code == 200:
@@ -115,17 +138,20 @@ def solve(challenge: Challenge, lane: str = "default", timeout_s: int = 120) -> 
     return None
 
 
-def solve_verbose(challenge: Challenge, lane: str = "default", timeout_s: int = 120) -> dict:
+def solve_verbose(
+    challenge: Challenge,
+    lane: str = "default",
+    timeout_s: int = 120,
+    purpose: str = "generic",
+    operation_id: str = "",
+    attempt: int = 1,
+) -> dict:
     """Like solve(), but always returns a dict with 'solved' and 'reason'."""
     resp = httpx.post(
         f"{solver_url()}/solve",
-        json={
-            "type": challenge.type,
-            "sitekey": challenge.sitekey or "unknown",
-            "page_url": challenge.page_url,
-            "lane": lane,
-            "timeout_s": timeout_s,
-        },
+        json=_solve_payload(
+            challenge, lane, timeout_s, purpose, operation_id, attempt
+        ),
         timeout=timeout_s + 30,
     )
     body = resp.json()
@@ -146,7 +172,14 @@ def _cmd_detect(args: argparse.Namespace) -> int:
 
 def _cmd_solve(args: argparse.Namespace) -> int:
     challenge = Challenge(type=args.type, sitekey=args.sitekey, page_url=args.url)
-    result = solve_verbose(challenge, lane=args.lane, timeout_s=args.timeout)
+    result = solve_verbose(
+        challenge,
+        lane=args.lane,
+        timeout_s=args.timeout,
+        purpose=args.purpose,
+        operation_id=args.operation_id,
+        attempt=args.attempt,
+    )
     print(json.dumps(result, indent=2))
     return 0 if result.get("solved") else 2
 
@@ -249,6 +282,17 @@ def main(argv: list[str] | None = None) -> int:
     p_solve.add_argument("--url", required=True)
     p_solve.add_argument("--lane", default="default")
     p_solve.add_argument("--timeout", type=int, default=120)
+    p_solve.add_argument(
+        "--purpose",
+        choices=["generic", "authentication", "read_only", "state_change"],
+        default="generic",
+    )
+    p_solve.add_argument(
+        "--operation-id",
+        default="",
+        help="opaque non-secret correlation ID (never stored raw in telemetry)",
+    )
+    p_solve.add_argument("--attempt", type=int, default=1)
     p_solve.set_defaults(func=_cmd_solve)
 
     p_health = sub.add_parser("health", help="service health check")
