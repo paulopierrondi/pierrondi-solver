@@ -2,8 +2,9 @@
 openai-compat endpoint, Moonshot/Kimi, etc.).
 
 Same TileClassifier contract as the Ollama backend: per-tile binary mode for
-independent 3x3 tiles, stitched labeled-grid mode for sliced photos, and
-consensus voting. Provider is selected by env:
+independent 3x3 tiles, stitched labeled-grid mode for sliced photos. Consensus
+voting applies to grid mode only; per-tile calls are single-shot to cap
+hosted-API cost. Provider is selected by env:
 
     SOLVER_VISION_PROVIDER   "ollama" (default) | "openai"
     SOLVER_VISION_BASE_URL   e.g. https://generativelanguage.googleapis.com/v1beta/openai
@@ -21,6 +22,7 @@ import json
 import os
 import time
 import urllib.request
+from dataclasses import dataclass
 
 from .vision_ollama import (
     label_grid,
@@ -64,18 +66,41 @@ def _save_budget(path: str, data: dict) -> None:
         pass  # budget persistence must never break a solve
 
 
+@dataclass
+class VisionBudget:
+    """Cost caps for a hosted vision backend (see OpenAIVisionClassifier).
+
+    ``max_calls_per_solve`` default 108 = 3 challenges x 4 rounds x 9
+    single-shot per-tile calls (worst case on the 3x3 path; the 4x4 grid
+    path uses only 3 x 4 x 3 = 36 voted calls). A lower cap aborts mid-solve
+    with ``budget_exceeded`` as soon as a challenge retry happens.
+    """
+
+    cost_per_call_usd: float = 0.005  # conservative for flash-class models
+    daily_budget_usd: float = 1.00
+    max_calls_per_solve: int = 108
+    path: str = _BUDGET_FILE
+
+    @classmethod
+    def from_env(cls, env: dict | None = None) -> "VisionBudget":
+        env = env if env is not None else os.environ
+        return cls(
+            cost_per_call_usd=float(env.get("SOLVER_VISION_COST_PER_CALL_USD", "0.005")),
+            daily_budget_usd=float(env.get("SOLVER_VISION_DAILY_BUDGET_USD", "1.00")),
+            max_calls_per_solve=int(env.get("SOLVER_VISION_MAX_CALLS_PER_SOLVE", "108")),
+        )
+
+
 class OpenAIVisionClassifier:
     """TileClassifier backed by an OpenAI-compatible chat completions API.
 
-    Cost control (hosted APIs are metered):
-    - ``SOLVER_VISION_COST_PER_CALL_USD`` (default 0.005, conservative for flash)
-      is charged per API call and accumulated in a daily counter at
-      ``data/vision_budget.json``.
-    - ``SOLVER_VISION_DAILY_BUDGET_USD`` (default 1.00) — when the day's
-      estimate crosses it, calls raise VisionBudgetExceeded and the strategy
-      reports an honest ``budget_exceeded`` reason.
-    - ``SOLVER_VISION_MAX_CALLS_PER_SOLVE`` (default 12) caps one solve's
-      blast radius (rounds x challenges x votes add up fast).
+    Cost control (hosted APIs are metered) is grouped in ``VisionBudget``:
+    ``cost_per_call_usd`` is charged per API call into a daily counter at
+    ``data/vision_budget.json``; crossing ``daily_budget_usd`` or
+    ``max_calls_per_solve`` raises VisionBudgetExceeded and the strategy
+    reports an honest ``budget_exceeded`` reason. Env overrides:
+    ``SOLVER_VISION_COST_PER_CALL_USD``, ``SOLVER_VISION_DAILY_BUDGET_USD``,
+    ``SOLVER_VISION_MAX_CALLS_PER_SOLVE``.
     """
 
     def __init__(
@@ -85,26 +110,18 @@ class OpenAIVisionClassifier:
         api_key: str = "",
         timeout_s: int = 120,
         votes: int = 3,
-        cost_per_call_usd: float | None = None,
-        daily_budget_usd: float | None = None,
-        max_calls_per_solve: int | None = None,
-        budget_path: str = _BUDGET_FILE,
+        budget: VisionBudget | None = None,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout_s = timeout_s
         self.votes = max(1, votes)
-        self.cost_per_call_usd = cost_per_call_usd if cost_per_call_usd is not None else float(
-            os.environ.get("SOLVER_VISION_COST_PER_CALL_USD", "0.005")
-        )
-        self.daily_budget_usd = daily_budget_usd if daily_budget_usd is not None else float(
-            os.environ.get("SOLVER_VISION_DAILY_BUDGET_USD", "1.00")
-        )
-        self.max_calls_per_solve = max_calls_per_solve if max_calls_per_solve is not None else int(
-            os.environ.get("SOLVER_VISION_MAX_CALLS_PER_SOLVE", "12")
-        )
-        self.budget_path = budget_path
+        budget = budget or VisionBudget.from_env()
+        self.cost_per_call_usd = budget.cost_per_call_usd
+        self.daily_budget_usd = budget.daily_budget_usd
+        self.max_calls_per_solve = budget.max_calls_per_solve
+        self.budget_path = budget.path
         self.calls_this_solve = 0
         self.cost_this_solve_usd = 0.0
 
@@ -114,8 +131,17 @@ class OpenAIVisionClassifier:
         self.cost_this_solve_usd = 0.0
 
     def classify(self, prompt: str, tile_images: list[bytes]) -> list[int]:
-        grid = 4 if len(tile_images) == 16 else 3
-        return self._classify_grid(prompt, tile_images, grid)
+        # 16 tiles = one photo sliced into a 4x4 grid: stitch and ask for grid
+        # cells, since objects span slices and each slice alone is unreadable.
+        # 9 independent 3x3 tiles classify better one-by-one; per-tile calls
+        # stay single-shot (no voting) to cap hosted-API cost.
+        if len(tile_images) == 16:
+            return self._classify_grid(prompt, tile_images, grid=4)
+        return [
+            idx
+            for idx, img in enumerate(tile_images)
+            if self._classify_one(prompt, img)
+        ]
 
     def _chat(self, content: str, images: list[bytes]) -> str:
         self.calls_this_solve += 1

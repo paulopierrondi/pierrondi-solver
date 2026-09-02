@@ -27,6 +27,8 @@ class Config:
     breaker_failure_rate: float = 0.30
     breaker_min_samples: int = 5
     breaker_window_s: int = 3600
+    # Seconds an open provider waits before one half-open trial attempt.
+    breaker_cooldown_s: int = 300
     # Browser engine used by local clearance strategies (e.g. Cloudflare).
     # Nodriver is the unattended default: it stays headless while avoiding
     # webdriver fingerprints that managed challenges commonly reject.
@@ -61,6 +63,7 @@ def load_config(env: dict | None = None) -> Config:
         breaker_failure_rate=float(env.get("SOLVER_BREAKER_FAILURE_RATE", "0.30")),
         breaker_min_samples=int(env.get("SOLVER_BREAKER_MIN_SAMPLES", "5")),
         breaker_window_s=int(env.get("SOLVER_BREAKER_WINDOW_S", "3600")),
+        breaker_cooldown_s=int(env.get("SOLVER_BREAKER_COOLDOWN_S", "300")),
         browser_engine=env.get("SOLVER_BROWSER_ENGINE", "nodriver").strip().lower(),
         proxy=env.get("SOLVER_PROXY", "").strip(),
         proxy_endpoint=env.get("SOLVER_PROXY_ENDPOINT", "").strip(),

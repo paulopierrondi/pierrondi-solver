@@ -5,6 +5,7 @@ import hashlib
 import os
 import sqlite3
 import time
+from dataclasses import dataclass
 from urllib.parse import urlparse
 
 _SCHEMA = """
@@ -46,6 +47,24 @@ def operation_fingerprint(operation_id: str) -> str:
     return hashlib.sha256(operation_id.encode()).hexdigest()[:12]
 
 
+@dataclass
+class AttemptLog:
+    """One solve attempt as logged to telemetry (token/operation_id hashed)."""
+
+    provider: str
+    challenge_type: str
+    strategy: str
+    page_url: str
+    lane: str
+    latency_ms: int
+    cost_usd: float
+    success: bool
+    token: str = ""
+    reason: str = ""
+    purpose: str = "generic"
+    operation_id: str = ""
+
+
 class Telemetry:
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
@@ -74,21 +93,7 @@ class Telemetry:
                 "ALTER TABLE solves ADD COLUMN operation_hash TEXT NOT NULL DEFAULT ''"
             )
 
-    def log_attempt(
-        self,
-        provider: str,
-        challenge_type: str,
-        strategy: str,
-        page_url: str,
-        lane: str,
-        latency_ms: int,
-        cost_usd: float,
-        success: bool,
-        token: str = "",
-        reason: str = "",
-        purpose: str = "generic",
-        operation_id: str = "",
-    ) -> None:
+    def log_attempt(self, entry: AttemptLog) -> None:
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO solves (ts, provider, challenge_type, strategy, site_host, lane,"
@@ -96,20 +101,33 @@ class Telemetry:
                 " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     time.time(),
-                    provider,
-                    challenge_type,
-                    strategy,
-                    _site_host(page_url),
-                    lane,
-                    int(latency_ms),
-                    float(cost_usd),
-                    1 if success else 0,
-                    token_fingerprint(token),
-                    reason[:500],
-                    purpose,
-                    operation_fingerprint(operation_id),
+                    entry.provider,
+                    entry.challenge_type,
+                    entry.strategy,
+                    _site_host(entry.page_url),
+                    entry.lane,
+                    int(entry.latency_ms),
+                    float(entry.cost_usd),
+                    1 if entry.success else 0,
+                    token_fingerprint(entry.token),
+                    entry.reason[:500],
+                    entry.purpose,
+                    operation_fingerprint(entry.operation_id),
                 ),
             )
+
+    def provider_outcomes(self, window_s: float) -> dict[str, list[bool]]:
+        """Recent per-provider success flags (oldest first), for breaker seeding."""
+        cutoff = time.time() - window_s
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT provider, success FROM solves WHERE ts >= ? ORDER BY ts",
+                (cutoff,),
+            ).fetchall()
+        outcomes: dict[str, list[bool]] = {}
+        for provider, success in rows:
+            outcomes.setdefault(provider, []).append(bool(success))
+        return outcomes
 
     def summary(self, since_s: float = 86400) -> dict:
         cutoff = time.time() - since_s

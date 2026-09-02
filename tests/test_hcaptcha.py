@@ -44,3 +44,36 @@ def test_strategy_name_and_provider():
     s = HCaptchaAudioStrategy(accessibility_cookie="cookie")
     assert s.name == "hcaptcha_audio"
     assert s.provider == "pierrondi"
+
+
+def test_rejected_accessibility_cookie_reports_renewal(monkeypatch):
+    # Challenge frame renders but hCaptcha refuses the audio variant (expired
+    # cookie): fail fast with an actionable reason, not an empty token.
+    from pierrondi_solver.strategies.hcaptcha import AccessibilityCookieRejected
+
+    monkeypatch.setattr(
+        "pierrondi_solver.strategies.hcaptcha._missing_deps", lambda: []
+    )
+
+    def boom(self, request):
+        raise AccessibilityCookieRejected("hcaptcha audio variant unavailable")
+
+    monkeypatch.setattr(HCaptchaAudioStrategy, "_solve_with_browser", boom)
+    outcome = HCaptchaAudioStrategy(accessibility_cookie="expired-cookie").solve(req())
+    assert outcome.solved is False
+    assert outcome.reason.startswith("accessibility_cookie_rejected")
+    assert "docs/GETTING_KEYS.md" in outcome.reason
+
+
+def test_generic_browser_failure_still_reports_failed(monkeypatch):
+    monkeypatch.setattr(
+        "pierrondi_solver.strategies.hcaptcha._missing_deps", lambda: []
+    )
+
+    def boom(self, request):
+        raise RuntimeError("hcaptcha audio source not found")
+
+    monkeypatch.setattr(HCaptchaAudioStrategy, "_solve_with_browser", boom)
+    outcome = HCaptchaAudioStrategy(accessibility_cookie="cookie").solve(req())
+    assert outcome.solved is False
+    assert outcome.reason.startswith("hcaptcha_audio_failed: RuntimeError")

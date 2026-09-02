@@ -19,7 +19,12 @@ def create_app(chain: SolverChain | None = None) -> FastAPI:
 
     @app.get("/metrics")
     def metrics(window_s: int = 86400) -> dict:
-        return app.state.chain.telemetry.summary(since_s=window_s)
+        summary = app.state.chain.telemetry.summary(since_s=window_s)
+        summary["circuit_breaker"] = {
+            provider: app.state.chain.breaker.stats(provider)
+            for provider in app.state.chain.config.chain()
+        }
+        return summary
 
     @app.post("/solve")
     def solve(request: SolveRequest):

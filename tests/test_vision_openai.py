@@ -6,6 +6,7 @@ import json
 
 from pierrondi_solver.strategies.vision_openai import (
     OpenAIVisionClassifier,
+    VisionBudget,
     build_openai_classifier,
 )
 
@@ -71,6 +72,35 @@ def test_classify_one_parse(monkeypatch):
     assert clf._classify_one("cars", _png()) is True
 
 
+def test_classify_nine_tiles_routes_per_tile(monkeypatch):
+    # Independent 3x3 tiles classify one-by-one, single-shot (no voting):
+    # exactly one API call per tile.
+    answers = iter(["NO", "YES", "NO", "NO", "YES", "NO", "NO", "NO", "YES"])
+    calls = []
+
+    def fake_urlopen(req, timeout=120):
+        calls.append(json.loads(req.data.decode()))
+        return _FakeResp(
+            json.dumps({"choices": [{"message": {"content": next(answers)}}]}).encode()
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    clf = OpenAIVisionClassifier(base_url="https://example.test", api_key="k", votes=3)
+    out = clf.classify("cars", [_png()] * 9)
+    assert out == [1, 4, 8]
+    assert len(calls) == 9  # single-shot per tile, votes not applied here
+    assert all(len(c["messages"][0]["content"]) == 2 for c in calls)
+
+
+def test_default_max_calls_per_solve(monkeypatch):
+    monkeypatch.delenv("SOLVER_VISION_MAX_CALLS_PER_SOLVE", raising=False)
+    clf = OpenAIVisionClassifier(base_url="https://x.test", api_key="k")
+    assert clf.max_calls_per_solve == 108
+    monkeypatch.setenv("SOLVER_VISION_MAX_CALLS_PER_SOLVE", "7")
+    clf = OpenAIVisionClassifier(base_url="https://x.test", api_key="k")
+    assert clf.max_calls_per_solve == 7
+
+
 def test_factory_requires_url_and_key():
     assert build_openai_classifier({}) is None
     assert build_openai_classifier({"SOLVER_VISION_BASE_URL": "https://x.test"}) is None
@@ -97,7 +127,7 @@ def test_daily_budget_kill_switch(monkeypatch, tmp_path):
         "cost_usd": 1.00,
     }))
     clf = OpenAIVisionClassifier(
-        base_url="https://x.test", api_key="k", budget_path=str(budget_file)
+        base_url="https://x.test", api_key="k", budget=VisionBudget(path=str(budget_file))
     )
     import pytest
 
@@ -117,8 +147,7 @@ def test_per_solve_call_cap(monkeypatch, tmp_path):
     clf = OpenAIVisionClassifier(
         base_url="https://x.test",
         api_key="k",
-        max_calls_per_solve=2,
-        budget_path=str(tmp_path / "b.json"),
+        budget=VisionBudget(max_calls_per_solve=2, path=str(tmp_path / "b.json")),
     )
     import pytest
 
@@ -146,8 +175,7 @@ def test_cost_accumulates_in_daily_file(tmp_path):
         clf = OpenAIVisionClassifier(
             base_url="https://x.test",
             api_key="k",
-            cost_per_call_usd=0.01,
-            budget_path=str(budget_file),
+            budget=VisionBudget(cost_per_call_usd=0.01, path=str(budget_file)),
         )
         clf._chat("q", [_png()])
         clf._chat("q", [_png()])

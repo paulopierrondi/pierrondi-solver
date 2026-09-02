@@ -39,7 +39,12 @@ flowchart LR
 
 1. A caller detects a supported challenge in HTML or sends a typed request.
 2. `POST /solve` validates the request through Pydantic.
-3. `SolverChain` evaluates providers in configured order.
+3. `SolverChain` evaluates providers in configured order. `request.timeout_s`
+   is the budget for the whole chain: each provider attempt receives the
+   remaining seconds, and an exhausted budget stops the chain with a
+   `chain_deadline_exceeded` marker. A local attempt that fails on a transient
+   transport error gets exactly one retry before falling through (never for
+   `state_change` requests).
 4. An open circuit is skipped. Missing keys, missing dependencies, and explicit
    stubs are also skipped without burning breaker budget.
 5. Every runnable attempt updates the breaker and telemetry.
@@ -125,4 +130,9 @@ The breaker opens only after the configured minimum sample count and when the
 failure rate exceeds the threshold inside the sliding time window. This prevents
 a degraded commercial provider from slowing every agent while allowing
 dependency/configuration skips to remain operational signals rather than false
-provider failures.
+provider failures. Once open, a provider stays out for the configured cooldown
+(`SOLVER_BREAKER_COOLDOWN_S`, default 300s); a single half-open trial then
+closes the breaker on success or restarts the cooldown on failure. At startup
+the breaker is seeded from recent telemetry, so an already-degraded provider
+starts open instead of re-learning it (a missing/unreadable telemetry DB starts
+clean).

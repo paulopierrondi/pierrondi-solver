@@ -129,11 +129,42 @@ def test_classify_per_tile_binary(monkeypatch):
         return _FakeResp(json.dumps({"message": {"content": next(answers)}}).encode())
 
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-    clf = OllamaVisionClassifier(per_tile=True)
+    clf = OllamaVisionClassifier(per_tile=True, votes=1)
     out = clf.classify("cars", [png(), png(), png(), png()])
     assert out == [1, 3]
     assert len(calls) == 4
     assert all(len(c["messages"][0]["images"]) == 1 for c in calls)
+
+
+def test_classify_per_tile_majority_vote(monkeypatch):
+    # Per-tile path honors `votes`: a tile verdict must win the majority.
+    from io import BytesIO
+
+    from PIL import Image
+
+    def png():
+        buf = BytesIO()
+        Image.new("RGB", (10, 10)).save(buf, format="PNG")
+        return buf.getvalue()
+
+    answers = iter([
+        "YES", "YES", "NO",   # tile 0 -> yes (2/3)
+        "NO", "NO", "YES",    # tile 1 -> no  (1/3)
+        "YES", "NO", "NO",    # tile 2 -> no  (1/3)
+        "YES", "YES", "YES",  # tile 3 -> yes (3/3)
+    ])
+
+    calls = []
+
+    def fake_urlopen(req, timeout=120):
+        calls.append(req)
+        return _FakeResp(json.dumps({"message": {"content": next(answers)}}).encode())
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    clf = OllamaVisionClassifier(per_tile=True, votes=3)
+    out = clf.classify("cars", [png(), png(), png(), png()])
+    assert out == [0, 3]
+    assert len(calls) == 12  # 4 tiles x 3 votes
 
 
 def test_parse_yes():
