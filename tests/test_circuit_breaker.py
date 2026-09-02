@@ -60,6 +60,8 @@ def test_invalid_params():
         CircuitBreaker(failure_rate=0)
     with pytest.raises(ValueError):
         CircuitBreaker(min_samples=0)
+    with pytest.raises(ValueError):
+        CircuitBreaker(cooldown_s=-1)
 
 
 def test_stats():
@@ -71,3 +73,101 @@ def test_stats():
     assert stats["failures"] == 1
     assert stats["failure_rate"] == 0.5
     assert stats["available"] is True
+    assert stats["half_open"] is False
+
+
+# --- half-open probe ---
+
+
+def _open_breaker(breaker):
+    for _ in range(5):
+        breaker.record("capsolver", success=False)
+
+
+def test_half_open_trial_after_cooldown_closes_on_success():
+    breaker, clock = make_breaker()
+    _open_breaker(breaker)
+    assert not breaker.is_available("capsolver")
+    clock.now += 299  # cooldown (300s) not elapsed
+    assert not breaker.is_available("capsolver")
+    clock.now += 1
+    assert breaker.is_available("capsolver")  # one trial attempt allowed
+    assert not breaker.is_available("capsolver")  # probe already in flight
+    breaker.record("capsolver", success=True)
+    assert breaker.is_available("capsolver")  # closed again, fresh window
+    stats = breaker.stats("capsolver")
+    assert stats["samples"] == 0
+
+
+def test_half_open_trial_failure_reopens_and_restarts_cooldown():
+    breaker, clock = make_breaker()
+    _open_breaker(breaker)
+    assert not breaker.is_available("capsolver")  # marks the open timestamp
+    clock.now += 300
+    assert breaker.is_available("capsolver")  # trial armed
+    breaker.record("capsolver", success=False)
+    assert not breaker.is_available("capsolver")  # re-opened immediately
+    clock.now += 299
+    assert not breaker.is_available("capsolver")  # cooldown restarted
+    clock.now += 1
+    assert breaker.is_available("capsolver")  # new trial allowed
+
+
+def test_stats_read_does_not_arm_probe():
+    breaker, clock = make_breaker()
+    _open_breaker(breaker)
+    assert not breaker.is_available("capsolver")  # marks the open timestamp
+    clock.now += 300
+    assert breaker.stats("capsolver")["available"] is False
+    assert breaker.stats("capsolver")["half_open"] is False
+    assert breaker.is_available("capsolver")  # probe still available for solve
+
+
+# --- telemetry seeding ---
+
+
+def test_seed_breaker_opens_degraded_provider(tmp_path):
+    from pierrondi_solver.chain import _seed_breaker
+    from pierrondi_solver.config import Config
+    from pierrondi_solver.telemetry import AttemptLog, Telemetry
+
+    telemetry = Telemetry(str(tmp_path / "t.db"))
+    for _ in range(5):
+        telemetry.log_attempt(AttemptLog(
+            provider="capsolver", challenge_type="recaptcha_v2", strategy="s",
+            page_url="https://example.com", lane="default", latency_ms=1,
+            cost_usd=0.0, success=False,
+        ))
+    breaker, _ = make_breaker()
+    _seed_breaker(breaker, telemetry, Config())
+    assert not breaker.is_available("capsolver")
+
+
+def test_seed_breaker_keeps_healthy_provider_closed(tmp_path):
+    from pierrondi_solver.chain import _seed_breaker
+    from pierrondi_solver.config import Config
+    from pierrondi_solver.telemetry import AttemptLog, Telemetry
+
+    telemetry = Telemetry(str(tmp_path / "t.db"))
+    for ok in [True, True, True, True, False]:
+        telemetry.log_attempt(AttemptLog(
+            provider="capsolver", challenge_type="recaptcha_v2", strategy="s",
+            page_url="https://example.com", lane="default", latency_ms=1,
+            cost_usd=0.0, success=ok,
+        ))
+    breaker, _ = make_breaker()
+    _seed_breaker(breaker, telemetry, Config())
+    assert breaker.is_available("capsolver")
+
+
+def test_seed_breaker_degrades_safe_on_telemetry_error():
+    from pierrondi_solver.chain import _seed_breaker
+    from pierrondi_solver.config import Config
+
+    class _BoomTelemetry:
+        def provider_outcomes(self, window_s):
+            raise RuntimeError("db unreadable")
+
+    breaker, _ = make_breaker()
+    _seed_breaker(breaker, _BoomTelemetry(), Config())
+    assert breaker.is_available("capsolver")  # starts clean

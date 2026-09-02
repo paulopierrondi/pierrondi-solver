@@ -38,9 +38,9 @@ class OllamaVisionClassifier:
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self.per_tile = per_tile
-        # Grid answers come from `votes` independent inferences; a cell must
-        # win the majority. Vision models are stochastic — consensus is the
-        # cheapest real accuracy lever.
+        # Answers come from `votes` independent inferences; a grid cell (or a
+        # tile verdict in per-tile mode) must win the majority. Vision models
+        # are stochastic — consensus is the cheapest real accuracy lever.
         self.votes = max(1, votes)
 
     def classify(self, prompt: str, tile_images: list[bytes]) -> list[int]:
@@ -99,8 +99,11 @@ class OllamaVisionClassifier:
             f"{prompt!r}. Does this tile show the target, even partially? "
             "Be generous with vehicles and large objects. Answer YES or NO only."
         )
-        answer = self._chat(question, [upscale_png(image)])
-        return parse_yes(answer)
+        # Local inference is $0, so honor `votes` here too: the tile verdict
+        # must win the majority, same rule as grid cells.
+        answers = [self._chat(question, [upscale_png(image)]) for _ in range(self.votes)]
+        yes = sum(1 for answer in answers if parse_yes(answer))
+        return yes >= self.votes // 2 + 1
 
     def _classify_batch(self, prompt: str, tile_images: list[bytes]) -> list[int]:
         return parse_indices(self._chat(_INSTRUCTION.format(prompt=prompt), tile_images), len(tile_images))

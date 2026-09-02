@@ -44,7 +44,25 @@ Buy the smallest package → get credentials in `user:pass@host:port` form → s
 /Users/paulopierrondi/.local/bin/brain-secret-intake
 ```
 
-## 5. Activate (no restart of anything needed beyond the service)
+## 5. hCaptcha accessibility cookie (`HCAPTCHA_ACCESSIBILITY_COOKIE`)
+
+The local $0 hCaptcha path solves the **audio** challenge variant, which hCaptcha only
+exposes when the public accessibility cookie `hc_accessibility` is present. The cookie
+is bound to your hCaptcha account session and **expires** — renewal is manual:
+
+1. Open **https://dashboard.hcaptcha.com** and sign in (Google). First time only:
+   go through `https://dashboard.hcaptcha.com/welcome_accessibility` and confirm the
+   verification email — that is what issues the cookie.
+2. DevTools → **Application → Cookies** → `.hcaptcha.com` → `hc_accessibility` → copy the **Value**.
+3. Store as `HCAPTCHA_ACCESSIBILITY_COOKIE` in `/Users/paulopierrondi/Projects/.keys.env`
+   (never in the repo, Markdown, or chat).
+4. Reload the service and probe (same commands as section 6).
+
+When the cookie is rejected, solves fail with reason
+`accessibility_cookie_rejected: renew hc_accessibility via docs/GETTING_KEYS.md`
+(previously the generic `hcaptcha_audio_empty_token`).
+
+## 6. Activate (no restart of anything needed beyond the service)
 
 ```bash
 # after keys are in .keys.env, reload the service with the env:

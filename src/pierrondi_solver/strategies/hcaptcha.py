@@ -31,6 +31,15 @@ MAX_ROUNDS = 2
 # not a bypass of authentication or 2FA.
 HC_ACCESSIBILITY_COOKIE_URL = "https://accounts.hcaptcha.com/verify_email/"
 
+COOKIE_REJECTED_REASON = (
+    "accessibility_cookie_rejected: renew hc_accessibility via docs/GETTING_KEYS.md"
+)
+
+
+class AccessibilityCookieRejected(RuntimeError):
+    """Challenge rendered but hCaptcha refused the audio variant: the
+    configured hc_accessibility cookie was rejected (expired/invalid)."""
+
 _USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -96,6 +105,13 @@ class HCaptchaAudioStrategy:
             )
         try:
             token = self._solve_with_browser(request)
+        except AccessibilityCookieRejected:
+            return StrategyOutcome(
+                strategy=self.name,
+                provider=self.provider,
+                latency_ms=_elapsed_ms(started),
+                reason=COOKIE_REJECTED_REASON,
+            )
         except Exception as exc:
             return StrategyOutcome(
                 strategy=self.name,
@@ -153,6 +169,14 @@ class HCaptchaAudioStrategy:
                 for _round in range(MAX_ROUNDS):
                     audio_url = _switch_to_audio_and_extract(challenge)
                     if not audio_url:
+                        # Challenge frame rendered but exposes no audio variant
+                        # at all (no #audio-button, no audio source): hCaptcha
+                        # rejected the accessibility cookie. Fail fast instead
+                        # of burning MAX_ROUNDS and reporting an empty token.
+                        if challenge.locator(AUDIO_BUTTON).count() == 0:
+                            raise AccessibilityCookieRejected(
+                                "hcaptcha audio variant unavailable"
+                            )
                         raise RuntimeError("hcaptcha audio source not found")
                     answer = self._transcribe(audio_url)
                     if not answer:
