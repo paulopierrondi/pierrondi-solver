@@ -66,6 +66,48 @@ absolute path if the venv is not on `PATH`:
 }
 ```
 
+### Windows
+
+The venv console script is an `.exe` under `Scripts`. Point every client at the
+absolute path (JSON configs escape backslashes; TOML configs prefer a literal
+single-quoted string):
+
+```json
+{
+  "mcpServers": {
+    "pierrondi-solver": {
+      "type": "stdio",
+      "command": "D:\\Projects\\pierrondi-solver\\.venv\\Scripts\\pierrondi-solver-mcp.exe",
+      "args": [],
+      "env": {
+        "PIERRONDI_SOLVER_URL": "http://127.0.0.1:8791"
+      }
+    }
+  }
+}
+```
+
+Codex (`~/.codex/config.toml`) uses literal strings for Windows paths:
+
+```toml
+[mcp_servers."pierrondi-solver"]
+command = 'D:\Projects\pierrondi-solver\.venv\Scripts\pierrondi-solver-mcp.exe'
+args = []
+
+[mcp_servers."pierrondi-solver".env]
+PIERRONDI_SOLVER_URL = "http://127.0.0.1:8791"
+```
+
+Keep the HTTP service available across reboots with the idempotent launcher
+(equivalent of the macOS LaunchAgent):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-pierrondi-solver.ps1
+```
+
+It exits 0 when the service already answers, recreates the venv when it
+disappeared, and logs to `data\service.log`.
+
 ### Run manually (stdio)
 
 ```bash

@@ -7,6 +7,21 @@ and the project uses semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Windows always-on launcher `scripts/start-pierrondi-solver.ps1`: idempotent
+  (exits 0 when the service answers), recreates the venv when it disappeared,
+  and logs to `data\service.log`.
+- `docs/MCP_SERVER.md` Windows section: client registration snippets for JSON
+  configs and Codex TOML (literal single-quoted paths), plus launcher usage.
+
+### Fixed
+
+- `doctor()` no longer crashes on Windows (`os.getuid` missing): the always-on
+  persistence check is platform-aware — macOS keeps the `launchctl` probe,
+  Windows checks the user Startup folder entry. Covered by Windows-only tests
+  (skipped on POSIX).
+
 ## [0.2.0] - 2026-07-28
 
 ### Added
