@@ -214,15 +214,30 @@ def doctor() -> list[dict]:
     except Exception as exc:
         results.append(_check("service_health", False, str(exc)[:200]))
 
-    # 3. LaunchAgent state (macOS)
+    # 3. Always-on persistence (macOS LaunchAgent / Windows Startup folder)
     try:
         import subprocess
-        out = subprocess.run(
-            ["launchctl", "print", f"gui/{os.getuid()}/com.paulo.pierrondi-solver"],
-            capture_output=True, text=True, timeout=10).stdout
-        running = "state = running" in out
-        results.append(_check("launchagent", running,
-                              "running" if running else "loaded but not running"))
+        if hasattr(os, "getuid"):
+            out = subprocess.run(
+                ["launchctl", "print", f"gui/{os.getuid()}/com.paulo.pierrondi-solver"],
+                capture_output=True, text=True, timeout=10).stdout
+            running = "state = running" in out
+            results.append(_check("launchagent", running,
+                                  "running" if running else "loaded but not running"))
+        else:
+            startup_dir = os.path.join(
+                os.environ.get("APPDATA", ""),
+                "Microsoft", "Windows", "Start Menu", "Programs", "Startup",
+            )
+            present = (
+                os.path.isdir(startup_dir)
+                and any(n.startswith("pierrondi-solver") for n in os.listdir(startup_dir))
+            )
+            results.append(_check(
+                "launchagent", present,
+                "startup entry present" if present
+                else "no Startup entry (optional; see scripts/start-pierrondi-solver.ps1)",
+            ))
     except Exception as exc:
         results.append(_check("launchagent", False, str(exc)[:120]))
 
